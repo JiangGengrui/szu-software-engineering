@@ -72,15 +72,27 @@ campus-album/
 
 ### 2. 安装依赖
 
+Windows PowerShell：
+
 ```powershell
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.lock.txt
 npm install
 ```
 
+macOS / Linux (`zsh` / `bash`)：
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.lock.txt
+npm install
+```
+
 ### 3. 初始化演示数据并启动后端
 
 首次初始化需要设置管理员和演示普通用户的密码。密码只通过环境变量传入，不写入源码。
+
+Windows PowerShell：
 
 ```powershell
 $env:PYTHONPATH = "backend"
@@ -90,21 +102,35 @@ $env:SEED_USER_PASSWORD = "请设置普通用户密码"
 .venv\Scripts\python.exe -m flask --app album:create_app run --host 127.0.0.1 --port 5000 --no-reload --no-debugger
 ```
 
+macOS / Linux (`zsh` / `bash`)：
+
+```bash
+PYTHONPATH=backend SEED_ADMIN_PASSWORD="请设置管理员密码" SEED_USER_PASSWORD="请设置普通用户密码" \
+  .venv/bin/python -m flask --app album:create_app init-demo
+PYTHONPATH=backend .venv/bin/python -m flask --app album:create_app run --host 127.0.0.1 --port 5000 --no-reload --no-debugger
+```
+
+> macOS 提示：如 `5000` 端口被系统「隔空播放接收器 (AirPlay Receiver)」占用，可改用 `--port 5001`，并在下方按本地覆盖方式指向 `http://127.0.0.1:5001`。
+
 后台入口：<http://127.0.0.1:5000/admin/login>
 
 初始化会在 `instance/` 写入数据库、密钥和媒体文件，不覆盖已有实例。重复初始化不会重置既有密码或作品；如种子用户名已被不同角色占用，初始化会拒绝而不是覆盖。
 
 ### 4. 构建并导入小程序
 
-```powershell
+```bash
 npm run build:mini
 ```
 
-在微信开发者工具中导入 `miniprogram/` 目录并填写 AppID。开发环境 API 地址位于 `miniprogram/core/config.ts`，默认是 `http://127.0.0.1:5000`。
+在微信开发者工具中导入 `miniprogram/` 目录并填写 AppID。开发环境默认 API 地址位于 `miniprogram/core/config.ts`（`http://127.0.0.1:5000`）。如需在开发者工具或局域网真机调试时切换端口/局域网 IP，无需修改受版本控制的源码，可在开发者工具控制台或真机 vConsole 中通过本地存储覆盖：
+
+```js
+wx.setStorageSync('campus_album_api_base_url', 'http://192.168.x.x:5000') // 恢复默认：wx.removeStorageSync('campus_album_api_base_url')
+```
 
 真机调试时：
 
-- 将 API 地址改为运行 Flask 的电脑局域网 IP；
+- 将本地覆盖地址指向运行 Flask 的电脑局域网 IP（或按需修改 `miniprogram/core/config.ts`）；
 - 让 Flask 使用 `--host 0.0.0.0`；
 - 手机与电脑处于同一可信局域网；
 - 共享 `project.config.json` 保持域名校验开启，仅本机 private 配置可临时关闭校验。
@@ -119,6 +145,7 @@ npm run build:mini
 | [DECISIONS.md](DECISIONS.md) | 已确认决策、冲突裁决和边界 |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 已通过 G3 的架构设计 |
 | [架构图](docs/architecture-campus-album.html) | 校园影集架构可视化 |
+| [联调与演示指南](docs/integration-guide.md) | 六人分工模块映射、macOS/局域网联调说明与演示主线核验记录 |
 | [PLAN.md](PLAN.md) | 已通过 G4 的实施计划与任务状态 |
 | [CHANGELOG.md](CHANGELOG.md) | 变更、影响和待同步事项 |
 | [AGENTS.md](AGENTS.md) | 工程规则、错误边界和协作协议 |

@@ -1,4 +1,4 @@
-import { API_BASE_URL, REQUEST_TIMEOUT } from './config';
+import { getApiBaseUrl, REQUEST_TIMEOUT } from './config';
 import { Envelope } from './types';
 
 export class ApiError extends Error {
@@ -14,7 +14,7 @@ export function send<T>(path: string, options: RequestOptions = {}): Promise<T> 
     const header: Record<string, string> = { 'Content-Type': options.contentType || 'application/json' };
     if (options.token) header.Authorization = `Bearer ${options.token}`;
     wx.request<Envelope<T>>({
-      url: API_BASE_URL + path, method, data: options.data, header, timeout: options.timeout || REQUEST_TIMEOUT,
+      url: getApiBaseUrl() + path, method, data: options.data, header, timeout: options.timeout || REQUEST_TIMEOUT,
       success(response) {
         const body = response.data;
         if (body && body.code === 0 && response.statusCode >= 200 && response.statusCode < 300) resolve(body.data);
