@@ -1,0 +1,22 @@
+{
+  "name": "campus-album",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "build:mini": "tsc -p tsconfig.json",
+    "lint": "npm run build:mini && eslint miniprogram backend/album/static scripts tests-node eslint.config.mjs --no-error-on-unmatched-pattern",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build:mini && node --test tests-node/*.test.cjs",
+    "traceability": "node scripts/check-traceability.mjs .",
+    "check:all": "node scripts/run-checks.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "eslint": "10.15.0",
+    "miniprogram-api-typings": "5.3.1",
+    "typescript": "7.0.2"
+  }
+}

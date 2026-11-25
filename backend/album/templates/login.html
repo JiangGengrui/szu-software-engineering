@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}管理员登录 · 校园影集{% endblock %}
+{% block main_class %}login-layout{% endblock %}
+{% block content %}
+<section class="login-intro" aria-labelledby="intro-title">
+  <p class="eyebrow">CAMPUS ALBUM</p><h1 id="intro-title">每一个校园瞬间，<br>都值得认真守护。</h1>
+  <p>在这里管理校园影集的用户与作品，<br>为校园活动留下友好、真实的记录。</p>
+  <div class="campus-art" aria-hidden="true"><div class="art-sun"></div><div class="art-building"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="art-line"></div></div>
+  <div class="intro-bottom">校园蓝 / 记录 · 连接 · 守护</div>
+</section>
+<section class="login-card" aria-labelledby="login-title">
+  <span class="section-kicker">管理入口</span><h2 id="login-title">欢迎回来</h2><p class="muted">请使用管理员账号登录校园影集后台。</p>
+  {% if error %}<div class="notice error" role="alert"><strong>登录未成功（{{ error.code }}）</strong><p>{{ error.message }}</p></div>{% endif %}
+  <form method="post" action="{{ url_for('admin.login') }}" class="login-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="username">用户名</label><input id="username" name="username" value="{{ username }}" autocomplete="username" placeholder="请输入管理员用户名" required>
+    <label for="password">密码</label><input id="password" name="password" type="password" autocomplete="current-password" placeholder="请输入密码" required>
+    <p class="field-help">连续输错5次将锁定账号5分钟。</p>
+    <button class="primary full" type="submit">登录管理后台</button><p class="submit-status" role="status" aria-live="polite"></p>
+  </form>
+  <div class="login-boundary"><strong>仅限管理员访问</strong><p>普通用户请在微信小程序中登录。此处不提供管理员注册入口。</p></div>
+</section>
+{% endblock %}

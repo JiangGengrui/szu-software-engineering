@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="校园影集项目开发流程图：六阶段流程、周五门禁、五份文档的使用时点与规则，以及当前阶段标记。">
+<title>校园影集 · 项目开发流程图 | 文档使用指南</title>
+<style>
+  :root{
+    --ink:#0f172a; --muted:#64748b; --soft:#475569; --line:#e2e8f0;
+    --bg:#f4f7fb; --card:#ffffff;
+    --navy:#0b2540; --navy2:#12395c; --navy3:#1f4e79;
+    --rose:#e11d48; --rose-soft:#fff1f2;
+    --prd:#2563eb; --prd-bg:#eff6ff;
+    --us:#0d9488; --us-bg:#f0fdfa;
+    --func:#7c3aed; --func-bg:#f5f3ff;
+    --arch:#ea580c; --arch-bg:#fff7ed;
+    --test:#dc2626; --test-bg:#fef2f2;
+    --shadow:0 12px 32px rgba(15,23,42,.07);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Microsoft YaHei UI","Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;
+    line-height:1.65; -webkit-font-smoothing:antialiased;
+  }
+  .hero{
+    position:relative; overflow:hidden; color:#fff;
+    padding:54px 24px 100px;
+    background:
+      radial-gradient(900px 420px at 8% -20%, rgba(76,148,205,.55) 0%, rgba(11,37,64,0) 62%),
+      radial-gradient(700px 380px at 96% 10%, rgba(225,29,72,.22) 0%, rgba(11,37,64,0) 60%),
+      linear-gradient(135deg,#081d33 0%,#0b2540 42%,#12395c 100%);
+  }
+  .hero::before{
+    content:""; position:absolute; inset:0; pointer-events:none; opacity:.16;
+    background-image:
+      linear-gradient(rgba(255,255,255,.22) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.22) 1px, transparent 1px);
+    background-size:46px 46px;
+    mask-image:linear-gradient(180deg,rgba(0,0,0,.7),transparent 82%);
+    -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.7),transparent 82%);
+  }
+  .hero-inner{max-width:1120px;margin:0 auto;position:relative;z-index:1}
+  .eyebrow{font-size:12.5px;letter-spacing:3px;color:#9cc3e6;font-weight:700}
+  h1{
+    font-size:clamp(30px,4vw,44px); line-height:1.25; margin:14px 0 10px;
+    letter-spacing:1px; font-weight:800;
+  }
+  .hero-sub{max-width:820px;color:#cfe0f1;font-size:15.5px;margin:0}
+  .hero-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+  .meta-pill{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:7px 13px;border-radius:999px;font-size:12.5px;
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#e2eef9;
+  }
+  .meta-pill b{color:#fff;font-weight:700}
+  .meta-pill.today{background:rgba(225,29,72,.2);border-color:rgba(253,164,175,.55);color:#ffe4e6}
+  .meta-pill.today b{color:#fff}
+  .print-btn{
+    position:absolute;right:24px;top:22px;z-index:3;
+    padding:9px 16px;border-radius:10px;cursor:pointer;font-family:inherit;
+    background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.28);
+    font-size:12.5px;transition:background .2s ease;
+  }
+  .print-btn:hover{background:rgba(255,255,255,.22)}
+  .page{max-width:1120px;margin:-58px auto 0;padding:0 24px 60px;position:relative;z-index:2}
+
+  .status-card{
+    background:#fff;border:1px solid var(--line);border-radius:18px;
+    box-shadow:var(--shadow);padding:22px 26px;
+    display:grid;grid-template-columns:minmax(0,1fr) auto;gap:26px;align-items:center;
+  }
+  .status-left{display:flex;gap:16px;align-items:flex-start}
+  .status-dot{
+    width:14px;height:14px;border-radius:50%;background:var(--rose);margin-top:7px;
+    box-shadow:0 0 0 5px rgba(225,29,72,.14);flex:none;
+    animation:dotpulse 2s ease-in-out infinite;
+  }
+  @keyframes dotpulse{
+    0%,100%{box-shadow:0 0 0 4px rgba(225,29,72,.12)}
+    50%{box-shadow:0 0 0 9px rgba(225,29,72,.04)}
+  }
+  .status-kicker{font-size:11.5px;letter-spacing:2px;color:var(--rose);font-weight:700}
+  .status-title{font-size:19px;font-weight:800;margin:3px 0 4px}
+  .status-sub{font-size:13.5px;color:var(--muted)}
+  .status-right{text-align:right;min-width:240px}
+  .stage-count{font-weight:800;color:var(--navy2);font-size:15px}
+  .stage-count b{font-size:28px;color:var(--rose);letter-spacing:1px}
+  .mini-track{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:10px 0 7px}
+  .mini-track span{height:8px;border-radius:999px;background:#e2e8f0}
+  .mini-track .active{background:linear-gradient(90deg,#e11d48,#fb7185)}
+  .mini-track .next{background:#cbd5e1}
+  .mini-labels{display:flex;justify-content:space-between;font-size:10.5px;color:#94a3b8;letter-spacing:.4px}
+  .mini-labels .on{color:var(--rose);font-weight:700}
+
+  .section{margin-top:34px}
+  .section-head{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:16px}
+  .section-head h2{font-size:22px;margin:0;letter-spacing:.5px}
+  .section-head h2 span{color:var(--navy3)}
+  .section-note{font-size:12.5px;color:var(--muted);max-width:640px}
+
+  .chain-line{
+    display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+    font-size:12.5px;color:var(--soft);margin-bottom:14px;
+    background:#fff;border:1px dashed #cbd5e1;border-radius:10px;padding:10px 14px;
+  }
+  .chain-line b{color:var(--navy2)}
+  .chain-line .arr{color:#94a3b8;font-weight:700}
+  .doc-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+  .doc-card{
+    background:#fff;border:1px solid var(--line);border-top:4px solid var(--c);
+    border-radius:14px;padding:15px 15px 14px;transition:transform .18s ease, box-shadow .18s ease;
+  }
+  .doc-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+  .doc-card .code{
+    display:inline-flex;align-items:center;justify-content:center;
+    font-family:Consolas,"Cascadia Mono",monospace;font-size:10.5px;font-weight:700;
+    letter-spacing:.8px;color:var(--c);background:var(--bgc);
+    border:1px solid var(--c);border-radius:999px;padding:2px 8px;
+  }
+  .doc-card h3{font-size:14px;margin:9px 0 2px}
+  .doc-card .role{font-size:11.5px;color:var(--c);font-weight:700;letter-spacing:.5px}
+  .doc-card p{font-size:12px;color:var(--muted);line-height:1.65;margin:8px 0 0}
+
+  .legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:12px;color:var(--muted);align-items:center}
+  .legend .lg{display:inline-flex;align-items:center;gap:6px}
+  .legend .dot{width:9px;height:9px;border-radius:3px;background:var(--c)}
+  .legend .diamond{
+    width:10px;height:10px;background:#fff;border:2px solid #f59e0b;transform:rotate(45deg);border-radius:2px;
+  }
+
+  .flow{--spine-w:108px;--spine-x:54px;position:relative;padding-top:6px}
+  .flow::before{
+    content:"";position:absolute;left:calc(var(--spine-x) - 1.5px);top:26px;bottom:40px;width:3px;
+    border-radius:2px;
+    background:linear-gradient(180deg,#cbd5e1 0%,#94a3b8 45%,#cbd5e1 100%);
+  }
+  .row{
+    display:grid;grid-template-columns:var(--spine-w) minmax(0,1fr);
+    column-gap:22px;position:relative;padding-bottom:26px;
+  }
+  .spine{position:relative;display:flex;justify-content:center;align-items:flex-start;padding-top:4px}
+  .spine::after{
+    content:"";position:absolute;left:50%;bottom:4px;transform:translateX(-50%);
+    width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;
+    border-top:9px solid #94a3b8;
+  }
+  .row.no-arrow .spine::after{display:none}
+  .node{
+    position:relative;z-index:2;width:58px;height:58px;border-radius:50%;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:#fff;border:3px solid #94a3b8;color:#475569;flex:none;
+  }
+  .node-id{font-family:Consolas,"Cascadia Mono",monospace;font-size:15px;font-weight:800;line-height:1.1}
+  .node-name{font-size:9.5px;letter-spacing:.5px;opacity:.8;margin-top:1px}
+  .node-next{border-color:var(--navy3);color:var(--navy3);background:#f0f7ff}
+  .node-future{border-color:#cbd5e1;color:#94a3b8;background:#fff}
+  .node-current{
+    border-color:#fff;color:#fff;background:linear-gradient(145deg,#fb7185,#e11d48 70%);
+    animation:ring 2.2s ease-out infinite;
+  }
+  .node-end{
+    width:52px;height:52px;border-color:#10b981;color:#047857;background:#ecfdf5;
+  }
+  .node-end .node-id{font-size:12px;letter-spacing:.5px}
+  @keyframes ring{
+    0%{box-shadow:0 0 0 0 rgba(225,29,72,.38)}
+    70%{box-shadow:0 0 0 15px rgba(225,29,72,0)}
+    100%{box-shadow:0 0 0 0 rgba(225,29,72,0)}
+  }
+  .gate-node{
+    position:relative;z-index:2;width:42px;height:42px;transform:rotate(45deg);border-radius:9px;
+    background:#fffbeb;border:3px solid #f59e0b;display:flex;align-items:center;justify-content:center;
+    margin-top:8px;flex:none;
+  }
+  .gate-node span{transform:rotate(-45deg);font-family:Consolas,"Cascadia Mono",monospace;font-size:11.5px;font-weight:800;color:#b45309}
+  .gate-node.milestone{background:#ecfdf5;border-color:#10b981}
+  .gate-node.milestone span{color:#047857}
+
+  .stage-card{
+    background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:20px 22px 18px;box-shadow:var(--shadow);
+  }
+  .stage-card.current{border:2px solid rgba(225,29,72,.55);box-shadow:0 16px 40px rgba(225,29,72,.13)}
+  .current-flag{
+    display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+    background:linear-gradient(90deg,#fff1f2,#fff7ed);
+    border:1px dashed #fda4af;border-radius:11px;
+    padding:8px 13px;margin-bottom:14px;font-size:12.5px;color:#9f1239;
+  }
+  .current-flag strong{font-size:12.5px;letter-spacing:.5px}
+  .current-flag span:last-child{color:#be123c;opacity:.9}
+  .flag-arrow{color:var(--rose);font-size:13px;animation:bob 1.5s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(-1px)}50%{transform:translateY(3px)}}
+
+  .stage-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}
+  .phase{font-size:10.5px;letter-spacing:2px;color:#94a3b8;font-weight:700}
+  .stage-title h3{font-size:19px;margin:2px 0 0;letter-spacing:.3px}
+  .stage-side{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+  .dates{font-size:12px;color:var(--muted);font-family:Consolas,"Cascadia Mono",monospace}
+  .chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:700;letter-spacing:.3px}
+  .chip-current{background:var(--rose-soft);color:#be123c;border:1px solid #fecdd3}
+  .chip-next{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+  .chip-plan{background:#f8fafc;color:#64748b;border:1px solid #e2e8f0}
+  .stage-meta{display:flex;flex-wrap:wrap;gap:6px 22px;margin:10px 0 12px;font-size:11.5px;color:#64748b}
+  .stage-meta b{color:#334155;font-weight:700;margin-right:4px}
+  .stage-meta .out{color:#334155}
+
+  .doc-list{border-top:1px dashed #e2e8f0;padding-top:10px}
+  .doc-row{
+    --c:#64748b;--bgc:#f8fafc;
+    display:grid;grid-template-columns:132px 178px minmax(0,1fr);
+    gap:12px;align-items:start;
+    border:1px solid #eef2f7;border-left:4px solid var(--c);border-radius:11px;
+    background:var(--bgc);padding:10px 12px;
+    transition:transform .16s ease,box-shadow .16s ease;
+  }
+  .doc-row + .doc-row{margin-top:7px}
+  .doc-row:hover{transform:translateX(2px);box-shadow:0 6px 18px rgba(15,23,42,.05)}
+  .doc-row.prd{--c:var(--prd);--bgc:var(--prd-bg)}
+  .doc-row.us{--c:var(--us);--bgc:var(--us-bg)}
+  .doc-row.func{--c:var(--func);--bgc:var(--func-bg)}
+  .doc-row.arch{--c:var(--arch);--bgc:var(--arch-bg)}
+  .doc-row.test{--c:var(--test);--bgc:var(--test-bg)}
+  .doc-name{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+  .doc-name .tag{
+    font-family:Consolas,"Cascadia Mono",monospace;font-size:10px;font-weight:800;letter-spacing:.6px;
+    color:var(--c);background:#fff;border:1px solid currentColor;border-radius:999px;padding:1px 7px;
+  }
+  .doc-name .name{font-size:12px;font-weight:700;color:#1e293b;line-height:1.4}
+  .when{font-size:12px;font-weight:700;color:#334155;line-height:1.5;padding-top:1px}
+  .when small{display:block;font-weight:400;color:var(--muted);font-size:10.5px;margin-top:2px}
+  .rule{font-size:12.5px;color:#475569;line-height:1.7}
+  .rule b{color:#1e293b;font-weight:700}
+
+  .gate-card{
+    border:1px dashed #fcd34d;background:#fffbeb;border-radius:13px;
+    padding:13px 16px;
+  }
+  .gate-card.milestone-card{border:1px solid #a7f3d0;background:#f0fdf9}
+  .gate-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .gate-head h4{margin:0;font-size:14px}
+  .gate-tag{font-size:10.5px;font-weight:800;letter-spacing:.8px;padding:2px 8px;border-radius:999px}
+  .gate-tag.done{background:#dcfce7;color:#047857;border:1px solid #a7f3d0}
+  .gate-tag.decision{background:#fef3c7;color:#b45309;border:1px solid #fde68a}
+  .gate-card p{font-size:12px;color:#78716c;margin:7px 0 0}
+  .gate-card.milestone-card p{color:#047857}
+  .branches{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .branch{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:8px}
+  .branch.yes{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+  .branch.no{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}
+
+  .finish-row{display:grid;grid-template-columns:var(--spine-w) minmax(0,1fr);column-gap:22px;position:relative}
+  .finish-row .spine::after{display:none}
+  .finish{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    background:linear-gradient(120deg,#0b2540,#12395c);color:#e2eef9;
+    border-radius:15px;padding:15px 20px;
+  }
+  .finish .end-mark{
+    font-family:Consolas,"Cascadia Mono",monospace;font-weight:800;font-size:11px;letter-spacing:1.5px;
+    background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);
+    padding:3px 9px;border-radius:7px;color:#fff;
+  }
+  .finish strong{color:#fff;font-size:14px}
+  .finish span{font-size:12px;color:#b9d2e8}
+
+  .rule-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .rule-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:0 6px 18px rgba(15,23,42,.04)}
+  .rule-card h4{margin:0 0 6px;font-size:14px;display:flex;align-items:center;gap:8px}
+  .rule-card h4 .idx{
+    width:22px;height:22px;border-radius:7px;background:#eff6ff;color:#1d4ed8;
+    display:inline-flex;align-items:center;justify-content:center;font-family:Consolas,monospace;font-size:11px;font-weight:800;
+  }
+  .rule-card p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.75}
+
+  footer{max-width:1120px;margin:0 auto;padding:0 24px 44px;color:#94a3b8;font-size:11.5px;line-height:1.8}
+  footer strong{color:#64748b}
+  footer .fn{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;border-top:1px solid #e2e8f0;padding-top:16px}
+
+  @media (max-width:980px){
+    .doc-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .doc-row{grid-template-columns:120px 1fr}
+    .rule{grid-column:1 / -1;padding-top:2px}
+    .status-card{grid-template-columns:1fr}
+    .status-right{text-align:left;min-width:0}
+    .mini-track{max-width:420px}
+  }
+  @media (max-width:680px){
+    .hero{padding:46px 18px 92px}
+    .print-btn{position:static;display:block;margin:0 0 16px auto}
+    .page{padding:0 14px 44px}
+    .status-card{padding:18px}
+    .doc-grid{grid-template-columns:1fr 1fr}
+    .flow{--spine-w:64px;--spine-x:32px}
+    .row,.finish-row{grid-template-columns:var(--spine-w) minmax(0,1fr);column-gap:12px}
+    .node{width:46px;height:46px;border-width:3px}
+    .node-id{font-size:12.5px}
+    .node-name{font-size:8px}
+    .gate-node{width:32px;height:32px;border-width:2px;margin-top:10px}
+    .gate-node span{font-size:9px}
+    .stage-card{padding:15px 14px}
+    .stage-head{flex-direction:column;gap:6px}
+    .stage-side{text-align:left;align-items:flex-start;flex-direction:row;gap:8px;flex-wrap:wrap}
+    .doc-row{grid-template-columns:1fr;gap:5px}
+    .doc-name{flex-direction:row;align-items:center;gap:7px}
+    .rule{grid-column:auto}
+    .rule-grid{grid-template-columns:1fr}
+    .finish{padding:13px 14px}
+  }
+  @media (max-width:430px){
+    .doc-grid{grid-template-columns:1fr}
+    h1{font-size:26px;letter-spacing:.5px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none !important;transition:none !important}
+  }
+  @media print{
+    body{background:#fff}
+    .hero{padding:34px 24px 60px;background:#0b2540 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .hero::before{display:none}
+    .page{margin-top:-30px}
+    .print-btn{display:none}
+    .status-card,.stage-card,.doc-card,.rule-card,.finish{box-shadow:none}
+    .row,.finish-row{break-inside:avoid}
+    .stage-card{break-inside:avoid}
+    footer{padding-bottom:20px}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <button class="print-btn" id="printBtn" type="button">打印 / 导出 PDF</button>
+  <div class="hero-inner">
+    <div class="eyebrow">软件工程课程 · 期末大作业 · 项目过程可视化</div>
+    <h1>校园影集 · 项目开发流程图</h1>
+    <p class="hero-sub">六个阶段、四道周五门禁、五份文档：看清每份文档在何时被使用、以什么规则约束开发，并用箭头定位当前所处的阶段。</p>
+    <div class="hero-meta">
+      <span class="meta-pill"><b>周期</b> 2026-11-20 → 12-17 · 4 周</span>
+      <span class="meta-pill today"><b>今天</b> 2026-11-19 · 阶段 0 定稿</span>
+      <span class="meta-pill"><b>团队</b> 6 人</span>
+      <span class="meta-pill"><b>需求基线</b> PRD V1.1</span>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+
+  <section class="status-card" aria-label="当前项目状态">
+    <div class="status-left">
+      <span class="status-dot" aria-hidden="true"></span>
+      <div>
+        <div class="status-kicker">CURRENT STATUS · 当前阶段</div>
+        <div class="status-title">阶段 0 / 6 · 开题与需求设计（收尾定稿）</div>
+        <div class="status-sub">五份文档已完成并冻结；11/20 Day1 需求冻结会后进入第 1 周编码。</div>
+      </div>
+    </div>
+    <div class="status-right">
+      <div class="stage-count"><b>01</b> / 06 阶段</div>
+      <div class="mini-track" aria-hidden="true">
+        <span class="active"></span><span class="next"></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="mini-labels"><span class="on">S0 设计</span><span>S1</span><span>S2</span><span>S3</span><span>S4</span><span>S5</span></div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="docsTitle">
+    <div class="section-head">
+      <h2 id="docsTitle">五份文档的角色与流向</h2>
+      <div class="section-note">PRD 是唯一基线；下游文档逐级引用上游 ID，不自行新增规则。</div>
+    </div>
+    <div class="chain-line">
+      <b>PRD 需求基线</b><span class="arr">→</span>
+      <b>用户故事</b><span class="arr">→</span>
+      产品功能设计 <span class="arr">·</span> 面向对象架构设计<span class="arr">→</span>
+      <b>白盒黑盒测试</b>
+    </div>
+    <div class="doc-grid">
+      <article class="doc-card" style="--c:var(--prd);--bgc:var(--prd-bg)">
+        <span class="code">PRD</span>
+        <h3>产品需求文档</h3>
+        <div class="role">需求基线</div>
+        <p>27 条 FR、R01–R20 决策、错误码、数据字典与验收口径；需求变更的唯一起点。</p>
+      </article>
+      <article class="doc-card" style="--c:var(--us);--bgc:var(--us-bg)">
+        <span class="code">US</span>
+        <h3>用户故事文档</h3>
+        <div class="role">验收单元</div>
+        <p>26 条用户故事，逐条回链 FR；每条含验收条件，是开发任务与测试的最小验收单元。</p>
+      </article>
+      <article class="doc-card" style="--c:var(--func);--bgc:var(--func-bg)">
+        <span class="code">UI</span>
+        <h3>产品功能设计</h3>
+        <div class="role">页面契约</div>
+        <p>P01–P09 线框图、字段、状态与校验文案；UI 验收条目用于编码自测和最终核对。</p>
+      </article>
+      <article class="doc-card" style="--c:var(--arch);--bgc:var(--arch-bg)">
+        <span class="code">ARCH</span>
+        <h3>面向对象架构设计</h3>
+        <div class="role">技术契约</div>
+        <p>分层架构、类图、ER、接口与部署视图；AD-01–08 记录取舍，接口字段即编码契约。</p>
+      </article>
+      <article class="doc-card" style="--c:var(--test);--bgc:var(--test-bg)">
+        <span class="code">TEST</span>
+        <h3>白盒黑盒测试文档</h3>
+        <div class="role">质量门禁</div>
+        <p>58 个黑盒 + 12 个白盒 + 6 个端到端用例；白盒路径、条件组合与黑盒边界全覆盖。</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="flowTitle">
+    <div class="section-head">
+      <h2 id="flowTitle">开发过程流程图 <span>· 文档使用指南</span></h2>
+      <div class="legend" aria-label="图例">
+        <span class="lg" style="--c:var(--prd)"><i class="dot"></i>PRD</span>
+        <span class="lg" style="--c:var(--us)"><i class="dot"></i>用户故事</span>
+        <span class="lg" style="--c:var(--func)"><i class="dot"></i>功能设计</span>
+        <span class="lg" style="--c:var(--arch)"><i class="dot"></i>架构设计</span>
+        <span class="lg" style="--c:var(--test)"><i class="dot"></i>测试文档</span>
+        <span class="lg"><i class="diamond"></i>门禁 / 里程碑</span>
+      </div>
+    </div>
+    <div class="section-note" style="margin:-6px 0 16px">左侧节点为阶段与门禁，右侧卡片逐份列出该阶段五份文档的「使用时点 + 使用规则」；门禁未通过则修复或降级后复演。</div>
+
+    <div class="flow">
+
+      <article class="row stage-row" aria-current="step">
+        <div class="spine">
+          <div class="node node-current"><span class="node-id">S0</span><span class="node-name">设计</span></div>
+        </div>
+        <div class="stage-card current">
+          <div class="current-flag">
+            <span class="flag-arrow" aria-hidden="true">▼</span>
+            <strong>当前阶段</strong>
+            <span>2026-11-19 · 五份文档已定稿，等待 11/20 启动编码</span>
+          </div>
+          <div class="stage-head">
+            <div class="stage-title">
+              <div class="phase">阶段 0 / 6</div>
+              <h3>开题与需求设计</h3>
+            </div>
+            <div class="stage-side">
+              <span class="chip chip-current">进行中 · 今日定稿</span>
+              <span class="dates">2026-11-17 – 11-19</span>
+            </div>
+          </div>
+          <div class="stage-meta">
+            <span><b>负责人</b>全组</span>
+            <span><b>阶段交付</b><span class="out">PRD V1.1 · 26 条 US · P01–P09 · 架构与接口契约 · 70 个 TC + 6 个 E2E 设计</span></span>
+          </div>
+          <div class="doc-list">
+            <div class="doc-row prd">
+              <div class="doc-name"><span class="tag">PRD</span><span class="name">产品需求文档</span></div>
+              <div class="when">11/17–11/19<small>编制定稿</small></div>
+              <div class="rule">汇总并关闭 <b>R01–R20</b> 决策，冻结 27 条 FR、错误码、数据字典与验收口径；V1.1 作为唯一需求基线。</div>
+            </div>
+            <div class="doc-row us">
+              <div class="doc-name"><span class="tag">US</span><span class="name">用户故事文档</span></div>
+              <div class="when">11/18–11/19<small>需求拆分</small></div>
+              <div class="rule">由 FR 拆出 <b>26 条用户故事</b>并逐条回链；验收条件成为开发自测与测试用例的最小验收单元。</div>
+            </div>
+            <div class="doc-row func">
+              <div class="doc-name"><span class="tag">UI</span><span class="name">产品功能设计</span></div>
+              <div class="when">11/19<small>交互定稿</small></div>
+              <div class="rule">依据 PRD + 用户故事固化 <b>P01–P09</b> 线框图、字段、状态与校验文案；页面 ID 与 UI 验收条目冻结。</div>
+            </div>
+            <div class="doc-row arch">
+              <div class="doc-name"><span class="tag">ARCH</span><span class="name">架构设计</span></div>
+              <div class="when">11/19<small>技术定稿</small></div>
+              <div class="rule">依据 PRD 固化分层架构、类图、ER、接口与部署视图；<b>AD-01–08</b> 记录取舍，接口字段成为编码契约。</div>
+            </div>
+            <div class="doc-row test">
+              <div class="doc-name"><span class="tag">TEST</span><span class="name">白盒黑盒测试</span></div>
+              <div class="when">11/19<small>用例设计</small></div>
+              <div class="rule">按验收条件与接口规则设计 <b>58 黑盒 + 12 白盒 + 6 端到端</b>用例；白盒独立路径与条件组合先行定稿。</div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="row gate-row">
+        <div class="spine"><div class="gate-node milestone"><span>M0</span></div></div>
+        <div class="gate-card milestone-card">
+          <div class="gate-head">
+            <span class="gate-tag done">里程碑 · 已达成</span>
+            <h4>M0 设计基线冻结 · 2026-11-19</h4>
+          </div>
+          <p>R01–R20 关闭、接口字段冻结、五份文档定稿。任何变更必须「评审 + 升版 + 同步全部下游文档」。</p>
+        </div>
+      </article>
+
+      <article class="row stage-row">
+        <div class="spine"><div class="node node-next"><span class="node-id">S1</span><span class="node-name">第1周</span></div></div>
+        <div class="stage-card">
+          <div class="stage-head">
+            <div class="stage-title">
+              <div class="phase">阶段 1 / 6 · 编码实现</div>
+              <h3>第 1 周：骨架与核心闭环</h3>
+            </div>
+            <div class="stage-side">
+              <span class="chip chip-next">下一步 · 11/20 启动</span>
+              <span class="dates">2026-11-20 – 11-26</span>
+            </div>
+          </div>
+          <div class="stage-meta">
+            <span><b>负责人</b>全组；李文俊集成</span>
+            <span><b>阶段交付</b><span class="out">登录、文字发布、首页可见；README 可启动</span></span>
+          </div>
+          <div class="doc-list">
+            <div class="doc-row prd">
+              <div class="doc-name"><span class="tag">PRD</span><span class="name">产品需求文档</span></div>
+              <div class="when">11/20 Day1<small>需求冻结会</small></div>
+              <div class="rule">逐条复核 R01–R20 与第 7 章接口表；开发期字段、错误码不得私改，变更须评审并升版。</div>
+            </div>
+            <div class="doc-row us">
+              <div class="doc-name"><span class="tag">US</span><span class="name">用户故事文档</span></div>
+              <div class="when">迭代一<small>任务拆分与开发</small></div>
+              <div class="rule">领取并实现 <b>US-001~006、US-010</b>；以每条故事的验收条件完成自测后再提测。</div>
+            </div>
+            <div class="doc-row func">
+              <div class="doc-name"><span class="tag">UI</span><span class="name">产品功能设计</span></div>
+              <div class="when">页面开发<small>P01 / P02 / P04</small></div>
+              <div class="rule">按线框图与校验文案实现登录注册、首页、文字发布基础态；对应 UI 验收条目作为自测清单。</div>
+            </div>
+            <div class="doc-row arch">
+              <div class="doc-name"><span class="tag">ARCH</span><span class="name">架构设计</span></div>
+              <div class="when">骨架搭建<small>第 1 周</small></div>
+              <div class="rule">按类图与 ER 建表，落地统一响应结构与错误码；seed、目录结构、部署方式按架构文档搭建。</div>
+            </div>
+            <div class="doc-row test">
+              <div class="doc-name"><span class="tag">TEST</span><span class="name">白盒黑盒测试</span></div>
+              <div class="when">提测前<small>测试工程</small></div>
+              <div class="rule">搭建测试工程；执行 AUTH 黑盒与发布白盒用例（<b>TC-PUB-WB-001~007</b>）；缺陷按 TC ID 记录并回归。</div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="row gate-row">
+        <div class="spine"><div class="gate-node"><span>G1</span></div></div>
+        <div class="gate-card">
+          <div class="gate-head">
+            <span class="gate-tag decision">门禁 · 决策</span>
+            <h4>G1 第 1 周集成演示通过？</h4>
+          </div>
+          <div class="branches">
+            <span class="branch yes">是 → 进入第 2 周</span>
+            <span class="branch no">否 ↺ 当周修复 / 按 PRD 2.3 降级后复演</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="row stage-row">
+        <div class="spine"><div class="node node-future"><span class="node-id">S2</span><span class="node-name">第2周</span></div></div>
+        <div class="stage-card">
+          <div class="stage-head">
+            <div class="stage-title">
+              <div class="phase">阶段 2 / 6 · 编码实现</div>
+              <h3>第 2 周：媒体与检索</h3>
+            </div>
+            <div class="stage-side">
+              <span class="chip chip-plan">计划中</span>
+              <span class="dates">2026-11-27 – 12-03</span>
+            </div>
+          </div>
+          <div class="stage-meta">
+            <span><b>负责人</b>吕辉亮、黄子特</span>
+            <span><b>阶段交付</b><span class="out">图片/视频可打开；作品可编辑删除；日期与标签检索可用</span></span>
+          </div>
+          <div class="doc-list">
+            <div class="doc-row prd">
+              <div class="doc-name"><span class="tag">PRD</span><span class="name">产品需求文档</span></div>
+              <div class="when">阶段启动<small>验收口径</small></div>
+              <div class="rule">媒体规则（图片 1–9 张 / 视频 1 个 / 不可混合 / 大小上限）与检索、分页规则逐条作为验收依据。</div>
+            </div>
+            <div class="doc-row us">
+              <div class="doc-name"><span class="tag">US</span><span class="name">用户故事文档</span></div>
+              <div class="when">迭代二<small>开发自测</small></div>
+              <div class="rule">完成 <b>US-007~009、US-011~015</b>；重点验证媒体发布、编辑保留原媒体、删除确认、筛选与分页。</div>
+            </div>
+            <div class="doc-row func">
+              <div class="doc-name"><span class="tag">UI</span><span class="name">产品功能设计</span></div>
+              <div class="when">页面实现<small>P02 / P03 / P04 / P05</small></div>
+              <div class="rule">实现发布页媒体态与错误态、详情媒体区、我的作品、首页筛选栏；界面文案与线框图保持一致。</div>
+            </div>
+            <div class="doc-row arch">
+              <div class="doc-name"><span class="tag">ARCH</span><span class="name">架构设计</span></div>
+              <div class="when">服务实现<small>第 2 周</small></div>
+              <div class="rule">MediaService 校验与落盘、WorkService 编辑与软删除、检索分页字段严格按接口契约实现。</div>
+            </div>
+            <div class="doc-row test">
+              <div class="doc-name"><span class="tag">TEST</span><span class="name">白盒黑盒测试</span></div>
+              <div class="when">提测后<small>边界验证</small></div>
+              <div class="rule">执行 <b>TC-PUB-BB-005~015、TC-SEARCH-BB-001~007</b>；9 图与第 10 图、10MB / 50MB 等边界逐条验证。</div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="row gate-row">
+        <div class="spine"><div class="gate-node"><span>G2</span></div></div>
+        <div class="gate-card">
+          <div class="gate-head">
+            <span class="gate-tag decision">门禁 · 决策</span>
+            <h4>G2 第 2 周集成演示通过？</h4>
+          </div>
+          <div class="branches">
+            <span class="branch yes">是 → 进入第 3 周</span>
+            <span class="branch no">否 ↺ 当周修复 / 按 PRD 2.3 降级后复演</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="row stage-row">
+        <div class="spine"><div class="node node-future"><span class="node-id">S3</span><span class="node-name">第3周</span></div></div>
+        <div class="stage-card">
+          <div class="stage-head">
+            <div class="stage-title">
+              <div class="phase">阶段 3 / 6 · 编码实现</div>
+              <h3>第 3 周：互动与后台</h3>
+            </div>
+            <div class="stage-side">
+              <span class="chip chip-plan">计划中</span>
+              <span class="dates">2026-12-04 – 12-10</span>
+            </div>
+          </div>
+          <div class="stage-meta">
+            <span><b>负责人</b>江耿锐、张轩玮、陈俊年</span>
+            <span><b>阶段交付</b><span class="out">评论评分可用；后台查删生效；移除后小程序同步隐藏</span></span>
+          </div>
+          <div class="doc-list">
+            <div class="doc-row prd">
+              <div class="doc-name"><span class="tag">PRD</span><span class="name">产品需求文档</span></div>
+              <div class="when">阶段启动<small>验收口径</small></div>
+              <div class="rule">评论 1–500 字、评分 1–5 且禁自评；后台仅 admin；移除作品后列表隐藏、详情返回 404 + 1010。</div>
+            </div>
+            <div class="doc-row us">
+              <div class="doc-name"><span class="tag">US</span><span class="name">用户故事文档</span></div>
+              <div class="when">迭代三<small>开发联调</small></div>
+              <div class="rule">完成 <b>US-016~026</b>：评论与评分、管理员登录、用户与内容管理、移除后的两端一致性。</div>
+            </div>
+            <div class="doc-row func">
+              <div class="doc-name"><span class="tag">UI</span><span class="name">产品功能设计</span></div>
+              <div class="when">页面实现<small>P03 / P06–P09</small></div>
+              <div class="rule">详情评论区与评分卡、账号设置、管理员登录、用户管理、内容管理；空态、错误态与二次确认按状态表实现。</div>
+            </div>
+            <div class="doc-row arch">
+              <div class="doc-name"><span class="tag">ARCH</span><span class="name">架构设计</span></div>
+              <div class="when">权限与联调<small>第 3 周</small></div>
+              <div class="rule">CommentService、RatingService、Admin 控制器落地；管理会话与 role=admin 双重校验后按接口契约联调。</div>
+            </div>
+            <div class="doc-row test">
+              <div class="doc-name"><span class="tag">TEST</span><span class="name">白盒黑盒测试</span></div>
+              <div class="when">联调后<small>权限矩阵</small></div>
+              <div class="rule">执行 <b>TC-INT-BB-001~008、TC-ADM-WB/BB、TC-USER-BB-001~004、TC-E2E-005/006</b>；验证 401 + 2001 / 403 + 2002。</div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="row gate-row">
+        <div class="spine"><div class="gate-node"><span>G3</span></div></div>
+        <div class="gate-card">
+          <div class="gate-head">
+            <span class="gate-tag decision">门禁 · 决策</span>
+            <h4>G3 第 3 周集成演示与两端一致性通过？</h4>
+          </div>
+          <div class="branches">
+            <span class="branch yes">是 → 进入系统测试周</span>
+            <span class="branch no">否 ↺ 当周修复 / 降级后复验</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="row stage-row">
+        <div class="spine"><div class="node node-future"><span class="node-id">S4</span><span class="node-name">第4周</span></div></div>
+        <div class="stage-card">
+          <div class="stage-head">
+            <div class="stage-title">
+              <div class="phase">阶段 4 / 6 · 测试与定稿</div>
+              <h3>第 4 周：系统测试与归档</h3>
+            </div>
+            <div class="stage-side">
+              <span class="chip chip-plan">计划中</span>
+              <span class="dates">2026-12-11 – 12-17</span>
+            </div>
+          </div>
+          <div class="stage-meta">
+            <span><b>负责人</b>全组；李文俊、张轩玮</span>
+            <span><b>阶段交付</b><span class="out">完整演示；测试记录与五份材料定稿</span></span>
+          </div>
+          <div class="doc-list">
+            <div class="doc-row prd">
+              <div class="doc-name"><span class="tag">PRD</span><span class="name">产品需求文档</span></div>
+              <div class="when">定稿核对<small>第 4 周</small></div>
+              <div class="rule">用第 9 章追溯矩阵逐条核对 <b>FR → US → TC</b>；未覆盖项补测或按 2.3 降级并记录，锁定最终版本。</div>
+            </div>
+            <div class="doc-row us">
+              <div class="doc-name"><span class="tag">US</span><span class="name">用户故事文档</span></div>
+              <div class="when">验收演示<small>第 4 周</small></div>
+              <div class="rule">按 26 条故事的验收条件编排演示脚本并逐条验收，形成课堂展示清单。</div>
+            </div>
+            <div class="doc-row func">
+              <div class="doc-name"><span class="tag">UI</span><span class="name">产品功能设计</span></div>
+              <div class="when">UI 验收<small>第 4 周</small></div>
+              <div class="rule">对照 P01–P09 线框图核对布局、文案与字数 / 数量边界提示；偏差登记后修复并复验。</div>
+            </div>
+            <div class="doc-row arch">
+              <div class="doc-name"><span class="tag">ARCH</span><span class="name">架构设计</span></div>
+              <div class="when">部署归档<small>第 4 周</small></div>
+              <div class="rule">按部署视图完成演示环境；接口文档、README、seed 说明随四份材料归档。</div>
+            </div>
+            <div class="doc-row test">
+              <div class="doc-name"><span class="tag">TEST</span><span class="name">白盒黑盒测试</span></div>
+              <div class="when">系统测试周<small>全量执行</small></div>
+              <div class="rule">执行 <b>70 个 TC 与 6 个 E2E</b>；每个测试集前重置 seed；缺陷修复后回归本用例、同路径用例与端到端主线。</div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="row gate-row">
+        <div class="spine"><div class="gate-node"><span>G4</span></div></div>
+        <div class="gate-card">
+          <div class="gate-head">
+            <span class="gate-tag decision">门禁 · 决策</span>
+            <h4>G4 系统测试与材料定稿通过？</h4>
+          </div>
+          <div class="branches">
+            <span class="branch yes">是 → 提交与课堂展示</span>
+            <span class="branch no">否 ↺ 缺陷修复 / 降级留痕后复验</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="row stage-row no-arrow">
+        <div class="spine"><div class="node node-future"><span class="node-id">S5</span><span class="node-name">提交</span></div></div>
+        <div class="stage-card">
+          <div class="stage-head">
+            <div class="stage-title">
+              <div class="phase">阶段 5 / 6 · 交付</div>
+              <h3>课堂展示与提交</h3>
+            </div>
+            <div class="stage-side">
+              <span class="chip chip-plan">计划中</span>
+              <span class="dates">2026-12-17</span>
+            </div>
+          </div>
+          <div class="stage-meta">
+            <span><b>负责人</b>全组</span>
+            <span><b>阶段交付</b><span class="out">可运行系统 + 五份文档 + 演示 PPT 归档</span></span>
+          </div>
+          <div class="doc-list">
+            <div class="doc-row prd">
+              <div class="doc-name"><span class="tag">PRD</span><span class="name">产品需求文档</span></div>
+              <div class="when">12/17<small>归档</small></div>
+              <div class="rule">锁定提交版，只做展示不现场新增需求；版本与变更记录随 PRD 归档。</div>
+            </div>
+            <div class="doc-row us">
+              <div class="doc-name"><span class="tag">US</span><span class="name">用户故事文档</span></div>
+              <div class="when">12/17<small>演示剧本</small></div>
+              <div class="rule">以端到端主线串讲：注册登录 → 发布（含媒体）→ 检索 → 评论评分 → 后台移除 → 两端一致。</div>
+            </div>
+            <div class="doc-row func">
+              <div class="doc-name"><span class="tag">UI</span><span class="name">产品功能设计</span></div>
+              <div class="when">12/17<small>讲解支撑</small></div>
+              <div class="rule">用线框图说明页面结构与交互取舍，并对应 UI 验收结果。</div>
+            </div>
+            <div class="doc-row arch">
+              <div class="doc-name"><span class="tag">ARCH</span><span class="name">架构设计</span></div>
+              <div class="when">12/17<small>讲解支撑</small></div>
+              <div class="rule">用架构图与部署图说明分层、接口和运行拓扑，对应 AD-01–08 决策。</div>
+            </div>
+            <div class="doc-row test">
+              <div class="doc-name"><span class="tag">TEST</span><span class="name">白盒黑盒测试</span></div>
+              <div class="when">12/17<small>质量证据</small></div>
+              <div class="rule">提交测试记录、缺陷回归结果与覆盖率统计，支撑最终验收结论。</div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <div class="finish-row">
+        <div class="spine"><div class="node node-end"><span class="node-id">END</span><span class="node-name">归档</span></div></div>
+        <div class="finish">
+          <span class="end-mark">END</span>
+          <strong>课程提交与课堂展示 · 2026-12-17</strong>
+          <span>交付：可运行系统 + 五份文档 + 演示 PPT</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="rulesTitle">
+    <div class="section-head">
+      <h2 id="rulesTitle">文档使用总则</h2>
+      <div class="section-note">四条规则贯穿六个阶段，适用于所有文档的引用、变更与验收。</div>
+    </div>
+    <div class="rule-grid">
+      <article class="rule-card">
+        <h4><span class="idx">01</span>单一基线</h4>
+        <p>PRD V1.1 定义需求、字段、错误码与验收口径；代码与下游文档不得偏离。出现冲突时，以 PRD 与冻结的接口字段为准。</p>
+      </article>
+      <article class="rule-card">
+        <h4><span class="idx">02</span>单向传导</h4>
+        <p>需求变更沿「PRD → 用户故事 → 功能设计 / 架构设计 → 测试文档」同步；每次变更须评审、升版并在文档中留痕。</p>
+      </article>
+      <article class="rule-card">
+        <h4><span class="idx">03</span>ID 全链路</h4>
+        <p>FR → US → P → TC 双向可追溯；代码提交、缺陷记录与测试结果必须引用对应 ID，避免口头约定。</p>
+      </article>
+      <article class="rule-card">
+        <h4><span class="idx">04</span>门禁与回归</h4>
+        <p>每周五集成演示 + 阶段末文档核对；未通过则修复或按 PRD 2.3 降级并留痕。缺陷关闭须回归本用例、同路径用例与端到端主线。</p>
+      </article>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="fn">
+    <div><strong>编制依据：</strong>《校园影集产品需求文档 PRD V1.1》第 10 章开发计划，以及用户故事、产品功能设计、面向对象架构设计、白盒黑盒测试四份交付文档。</div>
+    <div>状态截至 2026-11-19 · 节点日期随实际进度更新</div>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('printBtn').addEventListener('click', function () {
+    window.print();
+  });
+</script>
+</body>
+</html>

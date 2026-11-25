@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}请求未完成 · 校园影集{% endblock %}
+{% block content %}
+<section class="panel error-page"><span class="section-kicker">请求未完成</span><h1>{{ error.message }}</h1><p class="muted">错误码 {{ error.code }} · HTTP {{ error.status }}</p>
+<div class="notice error" role="alert">操作未获成功确认，请不要重复提交。重新查询当前状态后再决定下一步。</div>
+{% if error.code in [2001, 2002] %}<p>请使用有效的管理员账号重新登录。登录成功后进入用户管理。</p><a class="button primary" href="{{ url_for('admin.login_page') }}">管理员登录</a>{% else %}
+<form method="get" action="{{ return_url }}" class="preserved-filters"><h2>保留的筛选条件</h2>{% for key, value in preserved %}<label>{{ {'username':'用户名','user_id':'用户 ID','role':'角色','status':'状态','author':'作者','date':'活动日期','tag':'标签','page':'页码','page_size':'每页条数'}.get(key, key) }}<input name="{{ key }}" value="{{ value }}"></label>{% endfor %}<div class="filter-actions"><button class="primary" type="submit">重新查询状态</button><a class="button secondary" href="{{ return_url }}">清空条件返回</a></div></form>
+{% endif %}</section>
+{% endblock %}

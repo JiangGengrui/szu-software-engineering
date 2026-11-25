@@ -1,0 +1,36 @@
+# Python / Node 依赖与本地环境
+node_modules/
+.venv/
+instance/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.env
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+
+# 小程序 TypeScript 编译产物
+miniprogram/**/*.js
+
+# 仅保留在本机的验收/方法论/工具包
+/.qoder/
+/.mcp.json
+/.workbuddy/
+/.archify/
+/evidence/
+/tests/
+/tests-node/
+/scripts/
+/checklists/
+/templates/
+/ACCEPTANCE.md
+/METHODOLOGY.md
+
+# 微信开发者工具个人配置
+miniprogram/project.private.config.json

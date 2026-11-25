@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}用户管理 · 校园影集{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="section-kicker">账号与权限</p><h1>用户管理</h1><p class="muted">查询校园影集账号，管理用户状态与发布权限。</p></div><span class="count-label">匹配用户 <strong>{{ total }}</strong> 位</span></div>
+<section class="panel" aria-label="用户查询">
+<form class="filters" method="get" action="{{ url_for('admin.users') }}">
+  <div class="field"><label for="username">用户名</label><input id="username" name="username" value="{{ values.get('username', '') }}" placeholder="输入用户名片段"></div>
+  <div class="field short"><label for="user_id">用户 ID</label><input id="user_id" name="user_id" value="{{ values.get('user_id', '') }}" inputmode="numeric" placeholder="精确查询"></div>
+  <div class="field"><label for="role">角色</label><select id="role" name="role"><option value="">全部角色</option><option value="user" {{ 'selected' if values.get('role') == 'user' else '' }}>普通用户</option><option value="admin" {{ 'selected' if values.get('role') == 'admin' else '' }}>管理员</option></select></div>
+  <div class="field"><label for="status">状态</label><select id="status" name="status"><option value="">全部状态</option><option value="active" {{ 'selected' if values.get('status') == 'active' else '' }}>正常</option><option value="disabled" {{ 'selected' if values.get('status') == 'disabled' else '' }}>已禁用</option></select></div>
+  <div class="filter-actions"><button class="primary" type="submit">查询用户</button><a class="button secondary" href="{{ url_for('admin.users') }}">重置</a></div>
+</form>
+</section>
+<section class="panel results" aria-label="用户查询结果">
+<div class="panel-heading"><h2>用户列表</h2><p>作品总数包含已移除记录</p></div>
+{% if rows %}<table><thead><tr><th scope="col">ID</th><th scope="col">用户名</th><th scope="col">角色</th><th scope="col">状态</th><th scope="col">注册时间（UTC）</th><th scope="col">作品总数<br><small>含已移除</small></th><th scope="col">操作</th></tr></thead><tbody>
+{% for row in rows %}<tr>
+<td data-label="ID" class="number">{{ row.id }}</td><td data-label="用户名" class="strong">{{ row.username }}</td><td data-label="角色">{{ '管理员' if row.role == 'admin' else '普通用户' }}</td>
+<td data-label="状态"><span class="badge {{ row.status }}">{{ '正常 · active' if row.status == 'active' else '已禁用 · disabled' }}</span></td><td data-label="注册时间（UTC）"><time datetime="{{ row.created_at }}">{{ row.created_at.replace('T', ' ').replace('Z', '') }}</time></td><td data-label="作品总数（含已移除）" class="number">{{ row.work_count }}</td>
+<td data-label="操作">{% if row.status == 'active' and row.role == 'user' %}<form method="post" action="{{ url_for('admin.disable', user_id=row.id) }}" data-confirm="确认禁用用户 {{ row.username }}？账号将停止使用，其全部作品会下架。此操作不可恢复。">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% for key, value in values.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}<button type="submit" class="danger">禁用用户</button><p class="submit-status" role="status"></p></form>{% else %}<span class="unavailable">{{ '当前管理员' if row.id == g.admin.id else '不可操作' }}</span>{% endif %}</td>
+</tr>{% endfor %}</tbody></table>
+{% else %}<div class="empty"><span class="empty-symbol" aria-hidden="true">—</span><h3>暂无匹配用户</h3><p>试试调整用户名、ID、角色或状态条件。</p><a class="button secondary" href="{{ url_for('admin.users') }}">重置筛选</a></div>{% endif %}
+{% include 'pagination.html' %}
+</section>
+<p class="footnote">禁用操作会下架用户全部作品，但不物理删除历史评论与评分。</p>
+{% endblock %}

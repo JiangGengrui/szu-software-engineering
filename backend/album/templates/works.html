@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}作品管理 · 校园影集{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="section-kicker">内容与记录</p><h1>作品管理</h1><p class="muted">按作者、活动日期与标签定位作品，保留完整管理记录。</p></div><span class="count-label">匹配作品 <strong>{{ total }}</strong> 条</span></div>
+<section class="panel" aria-label="作品查询">
+<form class="filters works-filters" method="get" action="{{ url_for('admin.works') }}">
+<div class="field"><label for="author">作者用户名</label><input id="author" name="author" value="{{ values.get('author', '') }}" placeholder="输入用户名片段"></div>
+<div class="field"><label for="date">活动日期</label><input id="date" name="date" type="date" value="{{ values.get('date', '') }}"><span class="field-help">留空查询全部日期</span></div>
+<div class="field tags-filter"><label>标签 <span class="muted">（多选，全部匹配）</span></label><div class="tag-options">{% for tag in tags %}<label class="tag-choice"><input type="checkbox" name="tag" value="{{ tag }}" {{ 'checked' if tag in selected_tags else '' }}><span>{{ tag }}</span></label>{% else %}<span class="muted">暂无标签</span>{% endfor %}</div></div>
+<div class="field"><label for="status">状态</label><select id="status" name="status"><option value="">全部状态</option><option value="visible" {{ 'selected' if values.get('status') == 'visible' else '' }}>可见</option><option value="removed" {{ 'selected' if values.get('status') == 'removed' else '' }}>已移除</option></select></div>
+<div class="filter-actions"><button class="primary" type="submit">查询作品</button><a class="button secondary" href="{{ url_for('admin.works') }}">重置</a></div>
+</form>
+</section>
+<section class="panel results" aria-label="作品查询结果">
+<div class="panel-heading"><h2>作品列表</h2><p>包含可见及已移除作品</p></div>
+{% if rows %}<table class="work-table"><thead><tr><th scope="col">ID</th><th scope="col">作者</th><th scope="col" class="content-column">标题 / 正文摘要</th><th scope="col">活动日期</th><th scope="col">标签</th><th scope="col">状态</th><th scope="col">操作</th></tr></thead><tbody>
+{% for row in rows %}<tr><td data-label="ID" class="number">{{ row.id }}</td><td data-label="作者">{{ row.user.username }}</td><td data-label="标题 / 正文摘要"><strong>{{ row.title or '无标题作品' }}</strong>{% if row.summary %}<p class="summary">{{ row.summary }}</p>{% else %}<p class="summary">媒体作品 · 无正文</p>{% endif %}</td><td data-label="活动日期"><time>{{ row.activity_date }}</time></td><td data-label="标签"><div class="chips">{% for tag in row.tags %}<span class="chip">{{ tag }}</span>{% else %}<span class="muted">无标签</span>{% endfor %}</div></td><td data-label="状态"><span class="badge {{ row.status }}">{{ '可见 · visible' if row.status == 'visible' else '已移除 · removed' }}</span></td>
+<td data-label="操作">{% if row.status == 'visible' %}<form method="post" action="{{ url_for('admin.remove', work_id=row.id) }}" data-confirm="确认移除作品 #{{ row.id }}？移除后小程序与媒体入口均不可访问，此操作不可恢复。">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% for key, value in values.items() if key != 'tag' %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}{% for tag in selected_tags %}<input type="hidden" name="tag" value="{{ tag }}">{% endfor %}<button class="danger" type="submit">移除作品</button><p class="submit-status" role="status"></p></form>{% else %}<span class="unavailable">不可操作</span>{% endif %}</td></tr>{% endfor %}
+</tbody></table>{% else %}<div class="empty"><span class="empty-symbol" aria-hidden="true">—</span><h3>暂无匹配作品</h3><p>调整筛选条件，或清空条件查看全部管理记录。</p><a class="button secondary" href="{{ url_for('admin.works') }}">重置筛选</a></div>{% endif %}
+{% include 'pagination.html' %}
+</section>
+<p class="footnote">移除不可恢复。操作提交后，小程序下一次刷新将隐藏作品、媒体与互动内容。</p>
+{% endblock %}
