@@ -24,8 +24,11 @@ miniprogram/**/*.js
 /.workbuddy/
 /.archify/
 /evidence/
-/tests/
-/tests-node/
+# 账号与权限模块的用例随仓库提交；其余测试、工具与证据仍只保留在本机
+/tests/*
+!/tests/auth/
+/tests-node/*
+!/tests-node/auth.test.cjs
 /scripts/
 /checklists/
 /templates/

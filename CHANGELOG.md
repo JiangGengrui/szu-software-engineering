@@ -500,3 +500,18 @@
 - 结构校验：修改后运行`node scripts/check-traceability.mjs .`，退出0；31 R、157 AC、157 T、11 E、108执行/108通过/0失败/49未验证。
 - 边界：本次仅文档同步，未连接真机、未改代码/配置、未执行上传或性能；`core/config.ts`仍为127.0.0.1，真机运行前需改为电脑局域网IP（后续变更单独记录并重跑Gm）。
 - 记录人：Qoder，根据用户2026-11-24选择A方案及官方微信网络文档记录。
+
+## 2026-11-26 变更 040 — 补充账号与权限模块的用例、接口契约与验收清单
+
+- 类型：测试与文档增量；不修改业务代码、SPEC/AC、接口字段、依赖或任何验收口径。
+- 原因：仓库此前不包含可执行的账号模块用例与面向该模块的接口契约；克隆后 `npm test` 收集 0 条用例仍退出 0，无法据此判断账号与权限模块是否被覆盖。
+- 内容：
+  - 新增 `tests/auth/`（`conftest.py`、`support.py`、`test_register.py`、`test_login.py`、`test_password.py`、`test_token.py`）：按 AC-01～AC-21、AC-143 组织，使用独立临时实例与可推进的受控时钟，验证 604799/604800 秒边界时不真实等待。
+  - 新增 `tests-node/auth.test.cjs`：18 条用例覆盖 `AuthManager` 的结构校验、代次防护、401/403 清态、过期本地判断与重新登录。
+  - 新增 `docs/api-auth.md`：五条接口的字段、错误码矩阵、凭据生命周期、校验顺序、撤销语义，以及与后台 Session 的对照。
+  - 新增 `docs/auth-acceptance.md`：小程序侧 18 条正反路径、环境记录模板与结果汇总，初始状态全部为未执行。
+  - `.gitignore`：改为 `/tests/*` 配 `!/tests/auth/`、`/tests-node/*` 配 `!/tests-node/auth.test.cjs`，其余测试、工具与证据仍只保留在本机。
+  - `README.md`：文档导航新增两条入口，仓库边界与 `npm test` 说明同步。
+- 已执行：`npm test` 18/18 通过；`npm run lint`、`npm run typecheck` 退出 0；`ruff check backend tests` 通过；`PYTHONPATH=backend pytest tests/auth -q` → 79 passed（36.61s）。
+- 未执行与边界：`docs/auth-acceptance.md` 的 18 条真机路径未执行，状态保持未执行；本增量不证明 iOS/Android 真机链路可用。ACCEPTANCE 计数与 E 记录未变更（108 通过 / 0 失败 / 49 未验证），G5 仍未通过。
+- 记录人：陈俊年（账号与权限模块），根据本次增量记录。
