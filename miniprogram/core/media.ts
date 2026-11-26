@@ -40,3 +40,35 @@ export async function binaryParts(files: LocalMedia[]): Promise<BinaryPart[]> {
   }
   return parts;
 }
+
+// 真机上 <image> 对局域网 HTTP 资源可能直接失败；用已确认可用的 wx.request
+// 取回字节并落到本地临时文件，再交给 image/video 组件显示。
+export function cacheRemoteMedia(url: string, mime = ''): Promise<string> {
+  if (!/^https?:\/\//i.test(url)) return Promise.resolve(url);
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url, method: 'GET', responseType: 'arraybuffer', timeout: 60000,
+      success(result) {
+        const data = result.data;
+        if (result.statusCode < 200 || result.statusCode >= 300 || !(data instanceof ArrayBuffer)) {
+          reject(new Error('媒体读取失败')); return;
+        }
+        const fromUrl = (url.split('?')[0].split('.').pop() || '').toLowerCase();
+        const type = mime.toLowerCase();
+        const suffix = /^(jpe?g|png|gif|webp|mp4|mov)$/.test(fromUrl) ? fromUrl
+          : type.includes('png') ? 'png'
+            : type.includes('webp') ? 'webp'
+              : type.includes('gif') ? 'gif'
+                : type.includes('mp4') ? 'mp4'
+                  : type.includes('quicktime') ? 'mov' : 'jpg';
+        const filePath = `${wx.env.USER_DATA_PATH}/remote-${Date.now()}-${Math.random().toString(16).slice(2)}.${suffix}`;
+        wx.getFileSystemManager().writeFile({
+          filePath, data,
+          success() { resolve(filePath); },
+          fail() { reject(new Error('媒体缓存失败')); }
+        });
+      },
+      fail() { reject(new Error('媒体下载失败')); }
+    });
+  });
+}

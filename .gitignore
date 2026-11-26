@@ -9,6 +9,7 @@ __pycache__/
 .coverage
 htmlcov/
 .env
+/.env.local
 .DS_Store
 Thumbs.db
 *.log
@@ -34,3 +35,10 @@ miniprogram/**/*.js
 
 # 微信开发者工具个人配置
 miniprogram/project.private.config.json
+
+# 本地 PPT/幻灯片工具缓存
+/.cache/
+/.slidep/
+
+# Office 临时锁文件
+~$*

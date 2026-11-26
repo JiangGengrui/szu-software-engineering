@@ -1,5 +1,6 @@
 import { api, requireUser } from '../../core/api';
 import { auth } from '../../core/auth';
+import { cacheRemoteMedia } from '../../core/media';
 import { Pager } from '../../core/paging';
 import { detailView, displayTime, ratingText, unavailableState } from '../../core/presentation';
 import { goLogin, workId } from '../../core/source';
@@ -82,8 +83,22 @@ Page({
     finally { if (this.isCurrentRating(generation, ratingGeneration)) this.setData({ ratingBusy: false }); }
   },
   preview(event: TapEvent) { const urls = this.data.work?.media.filter(media => media.kind === 'image').map(media => media.url) || []; if (urls.length) wx.previewImage({ current: event.currentTarget.dataset.value || urls[0], urls }); },
-  async mediaFailed() {
-    const generation = this.generation; this.setData({ mediaError: '媒体加载失败，可重试；请检查网络及媒体是否仍可用' });
+  async mediaFailed(event?: TapEvent) {
+    const generation = this.generation;
+    const index = event ? Number(event.currentTarget.dataset.index) : -1;
+    const item = Number.isInteger(index) ? this.data.work?.media[index] : undefined;
+    if (item?.kind === 'image' && /^https?:\/\//i.test(item.url)) {
+      this.setData({ mediaError: '媒体加载失败，正在尝试本地缓存…' });
+      try {
+        const local = await cacheRemoteMedia(item.url, item.mime);
+        if (generation !== this.generation || !this.data.work) return;
+        const media = this.data.work.media.map((entry, current) => current === index ? { ...entry, url: local } : entry);
+        this.setData({ work: { ...this.data.work, media }, mediaError: '' });
+        return;
+      } catch { /* fall through to the availability check */ }
+    }
+    if (generation !== this.generation) return;
+    this.setData({ mediaError: '媒体加载失败，可重试；请检查网络及媒体是否仍可用' });
     try { await api<WorkDetail>(`/api/works/${this.id}`); }
     catch (error) { if (generation === this.generation && unavailableCode(error)) this.stopUnavailable(unavailableCode(error)); }
   },

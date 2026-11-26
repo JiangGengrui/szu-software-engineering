@@ -1,21 +1,22 @@
 import { api } from '../../core/api';
 import { auth } from '../../core/auth';
 import { selectTab } from '../../core/leave';
+import { cacheRemoteMedia } from '../../core/media';
 import { Pager } from '../../core/paging';
 import { myCard } from '../../core/presentation';
 import { goLogin } from '../../core/source';
 import { ApiError, errorMessage } from '../../core/transport';
 import { MyWorkCard, PageResult, TapEvent } from '../../core/types';
 Page({
-  data: { username: '', ready: false, checking: true, loading: false, list: [] as ReturnType<typeof myCard<MyWorkCard>>[], error: '', actionError: '', done: false, total: 0, deleting: 0, mediaFailures: {} as Record<string, boolean> },
+  data: { username: '', ready: false, checking: true, loading: false, list: [] as ReturnType<typeof myCard<MyWorkCard>>[], error: '', actionError: '', done: false, total: 0, deleting: 0, mediaFailures: {} as Record<string, boolean>, resolvedCovers: {} as Record<number, string> },
   pager: new Pager<MyWorkCard>(10), prompted: false, generation: 0,
   onShow() { selectTab(this, 'mine'); void this.refresh(); },
   onUnload() { this.generation++; this.pager.reset(); },
   onPullDownRefresh() { void this.refresh(); },
   onReachBottom() { void this.loadMore(); },
-  sync() { this.setData({ list: this.pager.list.map(myCard), loading: this.pager.loading, error: this.pager.error, done: this.pager.done, total: this.pager.total }); },
+  sync() { const resolved = this.data.resolvedCovers; this.setData({ list: this.pager.list.map(work => { const card = myCard(work); return resolved[work.id] ? { ...card, cover: resolved[work.id] } : card; }), loading: this.pager.loading, error: this.pager.error, done: this.pager.done, total: this.pager.total }); },
   async refresh() {
-    const generation = ++this.generation; this.pager.reset(); this.sync(); this.setData({ checking: true, ready: false, username: '', mediaFailures: {} });
+    const generation = ++this.generation; this.pager.reset(); this.sync(); this.setData({ checking: true, ready: false, username: '', mediaFailures: {}, resolvedCovers: {} });
     try {
       const user = await auth.confirm(); if (generation !== this.generation) return;
       if (!user) { if (!this.prompted) { this.prompted = true; goLogin({ page: 'mine' }); } return; }
@@ -51,6 +52,16 @@ Page({
   login() { goLogin({ page: 'mine' }); },
   settings() { wx.navigateTo({ url: '/pages/settings/index' }); },
   publish() { wx.switchTab({ url: '/pages/publish/index' }); },
-  imageError(event: TapEvent) { this.setData({ [`mediaFailures.${event.currentTarget.dataset.id}`]: true }); },
-  retryImage(event: TapEvent) { this.setData({ [`mediaFailures.${event.currentTarget.dataset.id}`]: false }); }
+  imageError(event: TapEvent) {
+    const id = Number(event.currentTarget.dataset.id);
+    const card = this.data.list.find(item => item.id === id);
+    if (!card?.cover || this.data.resolvedCovers[id]) { this.setData({ [`mediaFailures.${id}`]: true }); return; }
+    void cacheRemoteMedia(card.cover).then(path => {
+      this.setData({ [`resolvedCovers.${id}`]: path, [`mediaFailures.${id}`]: false }, () => this.sync());
+    }).catch(() => this.setData({ [`mediaFailures.${id}`]: true }));
+  },
+  retryImage(event: TapEvent) {
+    const id = Number(event.currentTarget.dataset.id);
+    this.setData({ [`mediaFailures.${id}`]: false, [`resolvedCovers.${id}`]: '' }, () => this.sync());
+  }
 });
