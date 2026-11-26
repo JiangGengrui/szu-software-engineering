@@ -512,6 +512,6 @@
   - 新增 `docs/auth-acceptance.md`：小程序侧 18 条正反路径、环境记录模板与结果汇总，初始状态全部为未执行。
   - `.gitignore`：改为 `/tests/*` 配 `!/tests/auth/`、`/tests-node/*` 配 `!/tests-node/auth.test.cjs`，其余测试、工具与证据仍只保留在本机。
   - `README.md`：文档导航新增两条入口，仓库边界与 `npm test` 说明同步。
-- 已执行：`npm test` 18/18 通过；`npm run lint`、`npm run typecheck` 退出 0；`ruff check backend tests` 通过。
-- 未执行与边界：后端用例仅通过静态检查，尚未在项目虚拟环境中完整执行，合并前须运行 `pytest tests/auth -q` 并附输出；`docs/auth-acceptance.md` 的 18 条真机路径未执行，状态保持未执行。ACCEPTANCE 计数与 E 记录未变更（108 通过 / 0 失败 / 49 未验证），G5 仍未通过。
+- 已执行：`npm test` 18/18 通过；`npm run lint`、`npm run typecheck` 退出 0；`ruff check backend tests` 通过；`PYTHONPATH=backend pytest tests/auth -q` → 79 passed（36.61s）。
+- 未执行与边界：`docs/auth-acceptance.md` 的 18 条真机路径未执行，状态保持未执行；本增量不证明 iOS/Android 真机链路可用。ACCEPTANCE 计数与 E 记录未变更（108 通过 / 0 失败 / 49 未验证），G5 仍未通过。
 - 记录人：陈俊年（账号与权限模块），根据本次增量记录。
