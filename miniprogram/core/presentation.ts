@@ -1,8 +1,8 @@
-import { API_BASE_URL } from './config';
+import { getApiBaseUrl } from './config';
 import { MyWorkCard, WorkCard, WorkDetail } from './types';
 export function mediaUrl(value: string | null | undefined): string {
   if (!value) return '';
-  if (/^\/media\/[1-9]\d*$/.test(value)) return API_BASE_URL + value;
+  if (/^\/media\/[1-9]\d*$/.test(value)) return getApiBaseUrl() + value;
   return /^https?:\/\/[^\s]+$/i.test(value) ? value : '';
 }
 export function ratingText(avg: number | null, count: number): string { return count > 0 && avg !== null && Number.isFinite(avg) ? `${avg.toFixed(1)}分 · ${count}人` : '暂无评分'; }
