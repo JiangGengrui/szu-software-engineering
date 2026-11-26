@@ -146,6 +146,8 @@ wx.setStorageSync('campus_album_api_base_url', 'http://192.168.x.x:5000') // 恢
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 已通过 G3 的架构设计 |
 | [架构图](docs/architecture-campus-album.html) | 校园影集架构可视化 |
 | [联调与演示指南](docs/integration-guide.md) | 六人分工模块映射、macOS/局域网联调说明与演示主线核验记录 |
+| [账号与权限接口契约](docs/api-auth.md) | 五条认证接口的字段、错误码矩阵、凭据生命周期与撤销语义 |
+| [账号与权限验收清单](docs/auth-acceptance.md) | 小程序侧 18 条正反路径的操作步骤、预期与证据位 |
 | [PLAN.md](PLAN.md) | 已通过 G4 的实施计划与任务状态 |
 | [CHANGELOG.md](CHANGELOG.md) | 变更、影响和待同步事项 |
 | [AGENTS.md](AGENTS.md) | 工程规则、错误边界和协作协议 |
@@ -156,7 +158,7 @@ wx.setStorageSync('campus_album_api_base_url', 'http://192.168.x.x:5000') // 恢
 
 为保持仓库聚焦，以下内容**仅保留在本地**，已加入 `.gitignore`，不随 GitHub 发布：
 
-- `tests/`、`tests-node/`
+- `tests/`、`tests-node/`（例外：`tests/auth/` 与 `tests-node/auth.test.cjs` 是账号与权限模块用例，随仓库提交）
 - `evidence/`
 - `scripts/`
 - `checklists/`
@@ -166,7 +168,7 @@ wx.setStorageSync('campus_album_api_base_url', 'http://192.168.x.x:5000') // 恢
 - `.archify/`（仅架构图 HTML 已整理到 `docs/architecture-campus-album.html`）
 - `.workbuddy/`
 
-因此，克隆本仓库后可以执行 `npm run build:mini`、`npm run typecheck` 和 `npm run lint`，也可以运行后端；但 `npm test`、`npm run traceability`、`npm run check:all` 依赖本地保留的 `tests-node/` 与 `scripts/`，公开仓库不包含这些文件。完整的 G5 验收证据仍以本地记录和独立审查为准。
+因此，克隆本仓库后可以执行 `npm run build:mini`、`npm run typecheck` 和 `npm run lint`，也可以运行后端；`npm test` 目前只运行已入仓的账号与权限客户端用例（`tests-node/auth.test.cjs`）。`npm run traceability`、`npm run check:all` 仍依赖本地保留的 `scripts/`，公开仓库不包含这些文件。后端账号与权限用例（`tests/auth/`）需在项目虚拟环境中执行 `pytest tests/auth -q`。完整的 G5 验收证据仍以本地记录和独立审查为准。
 
 ## 已知限制
 
