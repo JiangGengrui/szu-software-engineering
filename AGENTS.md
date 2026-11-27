@@ -7,6 +7,7 @@
 - backend/album：应用工厂、common/auth/work/media/interaction/admin六模块与models；表现层→Blueprint→Service→ORM。
 - backend/album/templates与static：Jinja2管理三页、CSS及必要确认脚本；不做SPA。
 - miniprogram：原生TypeScript/WXML/WXSS/JSON，tsc生成同目录CommonJS JS；不是H5。tests-node保存小程序核心和工具脚本测试，tests保存后端测试。
+- 表现层统一“相纸质”（D-030）：纸底`#FBF6E9`、相纸框`#FFFDF7`、焦糖`#C2703A`、深棕`#8A5A2B`；标题用系统宋体栈`Songti SC/STSong/Noto Serif CJK SC/SimSun`并在无宋体的Android回退无衬线，不加载网络字体；tabBar图标为WXSS内联SVG data-URI，不引入图标库或图片图标。首页默认相纸翻页（一屏一张），与列表视图共用同一分页数据。
 - instance：数据库、签名密钥、媒体/tmp，不是静态目录；测试使用独立临时实例。原docs文档不覆盖。
 - scripts：构建和追溯工具；.archify是设计图及其回执，不属于业务实现或应用验收。
 - Python使用snake_case、类型标注与SQLAlchemy2映射；TypeScript使用camelCase。后端DTO显式列字段，不返回整个ORM对象。
@@ -18,9 +19,9 @@
 - 服务端在写门和当前事务中校验身份/角色/状态；request user_id/role不能提权。SQLite显式BEGIN保证读快照，所有写入口使用同一进程RLock，单进程运行。
 - JSON壳、HTTP/业务码、后台HTML失败状态严格按架构§4；后台每次认证成功进入/admin/users，小程序回已知来源页面，不接受外部next地址。
 - 评论身份→作品→内容，评分身份→作品→分数→自评；发布/编辑检查最终有效作品，允许纯媒体，不允许标题单独满足内容。
-- 码点计数、二进制MB、名称区分大小写、北京时间、日期缺字段/空值、标签AND均按SPEC，不改变已确认边界。
-- 上传UUID受控键，暂存/移动/DB提交一次；提交前失败补偿仅删除本请求新文件；旧媒体inactive、软删除及禁用保留历史文件。媒体GET/HEAD/Range每次校验状态，no-store。
-- Token满604800秒拒绝，退出/改密递增版本；后台独立30分钟Session、按账号5次失败锁300秒、CSRF。
+- 码点计数、二进制MB、名称区分大小写、北京时间、日期缺字段/空值、标签AND均按SPEC，不改变已确认边界；标签先移除零宽/控制字符并折叠内部空白，封面≤512KiB且不占1—9张名额，暂存引用仅上传者可用且重启时只清理超过1小时的无引用文件。
+- 上传UUID受控键，暂存/移动/DB提交一次；逐文件暂存上传直接写入`u{上传者id}-{uuid}`受控键；提交前失败补偿仅删除本请求新文件；旧媒体inactive、软删除及禁用保留历史文件。媒体GET/HEAD/Range与封面GET每次校验状态，no-store。
+- Token满604800秒拒绝，退出/改密递增版本；普通用户登录按账号5次失败锁300秒；后台独立Session空闲30分钟、每次已认证请求续期且签发后8小时绝对失效，按账号5次失败锁300秒，CSRF。
 - 超时是结果未知，不能自动重放写请求或显示成功；列表保留筛选、表单保留非密码输入，原生详情收到不可用时清内容及互动。
 - 不记录密码/哈希、Authorization、Cookie、完整Token、上传原文件名或用户输入；日志仅请求ID、路由模板、状态码、耗时。debug/reloader关闭，Jinja转义，原生用户内容用text不注入HTML。
 

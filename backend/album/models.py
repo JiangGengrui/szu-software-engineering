@@ -29,7 +29,7 @@ class User(Base):
     __table_args__ = (
         CheckConstraint("role IN ('user','admin')"),
         CheckConstraint("status IN ('active','disabled')"),
-        CheckConstraint("token_version >= 0 AND admin_failures >= 0"),
+        CheckConstraint("token_version >= 0 AND admin_failures >= 0 AND login_failures >= 0"),
     )
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(20, collation="BINARY"), unique=True)
@@ -40,6 +40,8 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime)
     admin_failures: Mapped[int] = mapped_column(Integer, default=0)
     admin_locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    login_failures: Mapped[int] = mapped_column(Integer, default=0)
+    login_locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class Work(Base):
@@ -57,6 +59,9 @@ class Work(Base):
     content: Mapped[str] = mapped_column(Text, default="")
     activity_date: Mapped[date] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String, default="visible")
+    cover_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cover_mime: Mapped[str | None] = mapped_column(String, nullable=True)
+    cover_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)
     updated_at: Mapped[datetime] = mapped_column(DateTime)
 

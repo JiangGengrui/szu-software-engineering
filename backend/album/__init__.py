@@ -31,6 +31,20 @@ def _configure_sqlite(engine: Any) -> None:
         connection.exec_driver_sql("BEGIN")
 
 
+def _upgrade_schema() -> None:
+    """Add only the columns an existing instance is missing; no row is rewritten or deleted."""
+    additions = {
+        "users": {"login_failures": "INTEGER NOT NULL DEFAULT 0", "login_locked_until": "DATETIME"},
+        "works": {"cover_key": "TEXT", "cover_mime": "VARCHAR", "cover_size": "INTEGER"},
+    }
+    with db.engine.begin() as connection:
+        for table, columns in additions.items():
+            present = {row[1] for row in connection.exec_driver_sql(f"PRAGMA table_info({table})")}
+            for name, ddl in columns.items():
+                if name not in present:
+                    connection.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+
+
 def create_app(config: dict[str, Any] | None = None) -> Flask:
     supplied = dict(config or {})
     root = Path(__file__).resolve().parents[2] / "instance"
@@ -44,8 +58,11 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         MAX_CONTENT_LENGTH=100 * 1024 * 1024,
         MAX_FORM_MEMORY_SIZE=100 * 1024 * 1024,
         MAX_FORM_PARTS=1000,
+        MAX_JSON_LENGTH=64 * 1024,
         PASSWORD_METHOD="pbkdf2:sha256:600000",
         WRITE_LOCK_TIMEOUT=5.0,
+        ADMIN_SESSION_IDLE=1800,
+        ADMIN_SESSION_ABSOLUTE=28800,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=False,
@@ -73,6 +90,7 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         _configure_sqlite(db.engine)
         with WRITE_LOCK:
             Base.metadata.create_all(db.engine)
+            _upgrade_schema()
         app.extensions["dummy_password_hash"] = auth.hash_password(secrets.token_urlsafe(20))
         media.cleanup_orphans()
     for blueprint in (auth.bp, work.bp, interaction.bp, media.bp, admin.bp):
@@ -91,7 +109,11 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     def finish_request(response: Response) -> Response:
         response.headers["X-Request-ID"] = g.get("request_id", "")
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Cache-Control"] = "no-store"
+        # Media and API payloads stay non-cacheable; admin CSS/JS may be reused briefly.
+        if request.path.startswith("/static/") and response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=300"
+        else:
+            response.headers["Cache-Control"] = "no-store"
         if request.path.startswith("/admin"):
             response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
         route = request.url_rule.rule if request.url_rule else "unmatched"

@@ -1,6 +1,10 @@
+import { api } from './api';
+import { UPLOAD_TIMEOUT } from './config';
 import { LocalMedia } from './types';
-import { BinaryPart } from './multipart';
+import { buildMultipart, StreamPart } from './multipart';
 import { validateMedia } from './validation';
+export const COVER_LIMIT = 512 * 1024;
+export interface UploadedMedia { key: string; kind: 'image' | 'video'; mime: string; size_bytes: number }
 export function readFile(path: string): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => wx.getFileSystemManager().readFile({
     filePath: path, success(result) { typeof result.data === 'string' ? reject(new Error('无法读取媒体字节，请重新选择')) : resolve(result.data); },
@@ -28,17 +32,70 @@ export function chooseMedia(kind: 'image' | 'video'): Promise<LocalMedia[] | nul
     fail: error => /cancel/.test(error.errMsg) ? resolve(null) : reject(new Error('无法选择媒体，请检查微信相册/相机权限后重试'))
   }));
 }
-export async function binaryParts(files: LocalMedia[]): Promise<BinaryPart[]> {
-  const parts: BinaryPart[] = [];
+// Lazy readers let the multipart builder fill one request buffer file by file, so the
+// page never keeps every original image in memory at the same time.
+export function fileParts(files: LocalMedia[]): StreamPart[] {
   const issue = validateMedia(files);
   if (issue) throw new Error(issue.message);
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const bytes = await readFile(file.path);
-    if (bytes.byteLength !== file.size) throw new Error(`第${i + 1}个媒体文件已变化，请重新选择`);
-    parts.push({ field: file.kind === 'image' ? 'images' : 'video', name: file.name, mime: file.mime, bytes });
-  }
-  return parts;
+  return files.map(file => ({
+    field: file.kind === 'image' ? 'images' as const : 'video' as const,
+    name: file.name, mime: file.mime, size: file.size,
+    read: () => readFile(file.path)
+  }));
+}
+
+function compress(src: string, quality: number, width?: number): Promise<string | null> {
+  return new Promise(resolve => {
+    try {
+      wx.compressImage({
+        src, quality, compressedWidth: width,
+        success: result => resolve(result.tempFilePath),
+        fail: () => resolve(null)
+      });
+    } catch { resolve(null); }
+  });
+}
+
+function fileSize(path: string): Promise<number> {
+  return new Promise(resolve => {
+    try {
+      wx.getFileSystemManager().getFileInfo({
+        filePath: path,
+        success: info => resolve(info.size),
+        fail: () => resolve(0)
+      });
+    } catch { resolve(0); }
+  });
+}
+
+// The server never decodes images, so the list thumbnail is produced here. A cover is
+// optional: when compression is unsupported or still too large the list falls back to
+// the first saved image.
+export async function makeCover(file: LocalMedia): Promise<LocalMedia | null> {
+  if (file.kind !== 'image' || file.size <= COVER_LIMIT) return null;
+  const path = await compress(file.path, 60, 720) || await compress(file.path, 40);
+  if (!path) return null;
+  const suffix = (path.split('?')[0].split('.').pop() || '').toLowerCase();
+  const png = suffix === 'png';
+  if (!png && !/^jpe?g$/.test(suffix)) return null;
+  const size = await fileSize(path);
+  if (!(size > 0 && size <= COVER_LIMIT)) return null;
+  return { path, name: `cover-${Date.now()}.${png ? 'png' : 'jpg'}`, kind: 'image', mime: png ? 'image/png' : 'image/jpeg', size };
+}
+
+// One request per file keeps peak memory at a single media item and lets the caller
+// retry only the file that failed.
+export async function uploadMedia(file: LocalMedia): Promise<string> {
+  const boundary = `CampusAlbum_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const part: StreamPart = {
+    field: 'file', name: file.name, mime: file.mime, size: file.size,
+    read: () => readFile(file.path)
+  };
+  const multipart = await buildMultipart({}, [part], boundary);
+  const result = await api<UploadedMedia>('/api/uploads', {
+    method: 'POST', protected: true, data: multipart.body, contentType: multipart.contentType, timeout: UPLOAD_TIMEOUT
+  });
+  return result.key;
 }
 
 // 真机上 <image> 对局域网 HTTP 资源可能直接失败；用已确认可用的 wx.request

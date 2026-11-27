@@ -127,11 +127,23 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def json_body() -> bytes:
+    # JSON commands carry only a few scalar fields; the global 100MiB cap must not be reachable here.
+    limit = current_app.config.get("MAX_JSON_LENGTH", 64 * 1024)
+    declared = request.content_length
+    if declared is not None and declared > limit:
+        fail()
+    raw = request.get_data()
+    if len(raw) > limit:
+        fail()
+    return raw
+
+
 def json_fields(allowed: set[str], required: set[str] | None = None) -> dict[str, Any]:
     if not request.is_json or request.args:
         fail()
     try:
-        data = json.loads(request.get_data(), object_pairs_hook=_unique_object)
+        data = json.loads(json_body(), object_pairs_hook=_unique_object)
     except (ValueError, UnicodeError):
         fail()
     if not isinstance(data, dict) or set(data) - allowed or (required or set()) - set(data):
@@ -140,7 +152,7 @@ def json_fields(allowed: set[str], required: set[str] | None = None) -> dict[str
 
 
 def empty_body() -> None:
-    if request.get_data():
+    if json_body():
         if request.is_json:
             json_fields(set())
         else:
@@ -197,7 +209,7 @@ def tag_names(value: Any, publishing: bool = False) -> list[str]:
         fail(code)
     result: list[str] = []
     for item in value:
-        name = text(item, code).strip()
+        name = clean_tag(text(item, code))
         if not 1 <= len(name) <= 10:
             fail(code, "每个标签须为1—10字")
         if name not in result:
@@ -205,3 +217,12 @@ def tag_names(value: Any, publishing: bool = False) -> list[str]:
     if publishing and len(result) > 5:
         fail(1013, "最多填写5个不同标签")
     return result
+
+
+TAG_NOISE = re.compile("[\x00-\x08\x0e-\x1f\x7f-\x9f\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]")
+TAG_SPACE = re.compile("[\t-\r\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+")
+
+
+def clean_tag(name: str) -> str:
+    """Remove invisible/control code points and fold internal whitespace before trim."""
+    return TAG_SPACE.sub(" ", TAG_NOISE.sub("", name)).strip()

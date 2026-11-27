@@ -22,7 +22,7 @@ from .common import (
     text,
     today,
 )
-from .media import move_staged, stage_collection
+from .media import StagedMedia, move_staged, stage_collection, staged_cover, staged_media
 from .models import Media, Rating, Tag, User, Work, WorkTag, db
 
 bp = Blueprint("work", __name__, url_prefix="/api")
@@ -57,6 +57,14 @@ def media_public(item: Media) -> dict[str, Any]:
             "size_bytes": item.size_bytes, "position": item.position}
 
 
+def work_cover_url(work: Work, items: list[Media]) -> str | None:
+    if work.status != "visible":
+        return None
+    if work.cover_key:
+        return f"/media/cover/{work.id}"
+    return f"/media/{items[0].id}" if items and items[0].kind == "image" else None
+
+
 def projections(works: list[Work], mode: str = "public", detail: bool = False) -> list[dict[str, Any]]:
     if not works:
         return []
@@ -82,10 +90,12 @@ def projections(works: list[Work], mode: str = "public", detail: bool = False) -
             "activity_date": work.activity_date.isoformat(), "status": work.status,
         }
         if mode == "admin":
-            row.update(user={"id": author.id, "username": author.username}, tags=tags[work.id])
+            row.update(user={"id": author.id, "username": author.username}, tags=tags[work.id],
+                       cover_url=work_cover_url(work, items), media_count=len(items),
+                       media_url=f"/media/{items[0].id}" if items and work.status == "visible" else None)
         else:
             row.update(created_at=iso(work.created_at), media_kind=items[0].kind if items else "text",
-                       cover_url=f"/media/{items[0].id}" if items and items[0].kind == "image" and work.status == "visible" else None)
+                       cover_url=work_cover_url(work, items))
             if mode != "mine":
                 total, count = ratings.get(work.id, (0, 0))
                 row.update(user={"id": author.id, "username": author.username},
@@ -143,10 +153,26 @@ def replace_tags(work: Work, names: list[str]) -> None:
         db.session.add(WorkTag(work_id=work.id, tag_id=tag.id))
 
 
+def reference_media(user: User, keys: list[str]) -> list[tuple[str, str, str, int]]:
+    """Resolve staged keys with the same B/C/D short-circuit order as direct uploads."""
+    if len(set(keys)) != len(keys):
+        fail(1001, "媒体引用重复")
+    items = [staged_media(user.id, key) for key in keys]
+    images = [item for item in items if item[0] == "image"]
+    videos = [item for item in items if item[0] == "video"]
+    if images and videos:
+        fail(1014)
+    if len(images) > 9:
+        fail(1015, "图片最多9张")
+    if len(videos) > 1:
+        fail(1015, "视频最多1个")
+    return items
+
+
 def save_work(user: User, work: Work | None = None) -> Work:
     if request.mimetype != "multipart/form-data" or request.args:
         fail()
-    values = fields(request.form, {"title", "content", "activity_date", "tags"})
+    values = fields(request.form, {"title", "content", "activity_date", "tags", "media_keys", "cover_key"})
     if set(request.files) - {"images", "video"}:
         fail()
     # A malformed body can be decoded as an empty form; it must not become a successful no-op edit.
@@ -172,8 +198,35 @@ def save_work(user: User, work: Work | None = None) -> Work:
     elif work is None:
         names = []
     images, videos = request.files.getlist("images"), request.files.getlist("video")
+    keys: list[str] | None = None
+    if "media_keys" in values:
+        try:
+            parsed = json.loads(values["media_keys"])
+        except (ValueError, UnicodeError):
+            fail(1001, "媒体引用不合法")
+        if not isinstance(parsed, list) or not parsed or not all(isinstance(key, str) for key in parsed):
+            fail(1001, "媒体引用不合法")
+        if images or videos:
+            fail(1001, "不能同时提交媒体文件与媒体引用")
+        keys = parsed
     retained = list(db.session.scalars(select(Media).where(Media.work_id == work.id, Media.active.is_(True)))) if work else []
-    staged = stage_collection(content, images, videos, [] if images or videos else retained)
+    referenced: list[tuple[str, str, str, int]] = []
+    staged: list[StagedMedia] = []
+    if keys is not None:
+        referenced = reference_media(user, keys)
+    else:
+        staged = stage_collection(content, images, videos, [] if images or videos else retained)
+    replacing = bool(images or videos) or keys is not None
+    cover: tuple[str, str, int] | None = None
+    if "cover_key" in values:
+        if not values["cover_key"]:
+            fail(1015, "封面引用不合法")
+        effective = (referenced if keys is not None
+                     else [(item.kind, item.mime, item.key, item.size) for item in staged] if replacing
+                     else [(item.kind, item.mime, item.file_key, item.size_bytes) for item in retained])
+        if not any(kind == "image" for kind, _, _, _ in effective):
+            fail(1015, "没有图片的作品不能设置缩略封面")
+        cover = staged_cover(user.id, values["cover_key"])
     if work is None:
         work = Work(user_id=user.id, created_at=now())
         db.session.add(work)
@@ -181,12 +234,16 @@ def save_work(user: User, work: Work | None = None) -> Work:
     db.session.flush()
     if names is not None:
         replace_tags(work, names)
-    if staged:
+    if replacing:
         for previous in retained:
             previous.active = False
-        for position, item in enumerate(staged):
-            db.session.add(Media(work_id=work.id, kind=item.kind, file_key=item.key, mime=item.mime,
-                                 size_bytes=item.size, position=position, created_at=now()))
+        entries = referenced if keys is not None else [(item.kind, item.mime, item.key, item.size) for item in staged]
+        for position, (kind, mime, key, size) in enumerate(entries):
+            db.session.add(Media(work_id=work.id, kind=kind, file_key=key, mime=mime,
+                                 size_bytes=size, position=position, created_at=now()))
+        work.cover_key, work.cover_mime, work.cover_size = cover or (None, None, None)
+    elif cover is not None:
+        work.cover_key, work.cover_mime, work.cover_size = cover
     db.session.flush()
     move_staged(staged)
     return work

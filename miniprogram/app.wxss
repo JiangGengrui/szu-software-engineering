@@ -1,1 +1,55 @@
-page{background:#f4f6fa;color:#1e293b;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;font-size:30rpx;line-height:1.6}view,text,button,input,textarea{box-sizing:border-box}button{min-height:44px;line-height:1.4;padding:22rpx 28rpx;border-radius:16rpx;font-size:28rpx;background:#fff;color:#2f5597;margin:0}button::after{border:1px solid #cbd5e1;border-radius:16rpx}button[disabled]{background:#e8edf4;color:#637184}button.primary{background:#2f5597;color:#fff}button.primary::after{border:0}button.danger{color:#b42318}button.link{background:transparent;padding:16rpx}button.link::after{border:0}.page{padding:32rpx;max-width:960rpx;margin:0 auto}.tab-page{padding-bottom:calc(160rpx + env(safe-area-inset-bottom))}.panel{background:#fff;border:1px solid #e4e9f1;border-radius:24rpx;padding:28rpx;margin-bottom:24rpx}.row{display:flex;align-items:center;gap:16rpx}.between{justify-content:space-between}.wrap{flex-wrap:wrap}.grow{flex:1;min-width:0}.muted{color:#64748b;font-size:26rpx}.title{font-size:38rpx;font-weight:650;line-height:1.35;word-break:break-all}.subtitle{font-size:32rpx;font-weight:600}.section-title{font-size:32rpx;font-weight:600;margin-bottom:20rpx}.field{margin-bottom:28rpx}.label{display:block;font-weight:550;margin-bottom:12rpx}input,textarea{background:#f7f9fc;border:1px solid #ccd5e3;border-radius:14rpx;min-height:44px;padding:20rpx;width:100%;font-size:30rpx}textarea{height:280rpx;line-height:1.6}.field-error,.error{color:#a62118;font-size:27rpx;word-break:break-all}.error-box{background:#fff1ef;border:1px solid #ffd2cc;border-radius:16rpx;padding:24rpx;margin:20rpx 0}.hint{color:#64748b;font-size:25rpx;margin-top:10rpx}.state{padding:64rpx 24rpx;text-align:center}.state button{margin:24rpx auto 0;max-width:360rpx}.state-title{font-size:34rpx;font-weight:600;margin-bottom:12rpx}.chip{display:inline-flex;align-items:center;background:#eaf0fa;color:#2f5597;border-radius:24rpx;padding:8rpx 20rpx;font-size:25rpx}.chip-button{border-radius:28rpx;white-space:nowrap;flex-shrink:0}.cover{width:100%;height:0;padding-bottom:56.25%;position:relative;overflow:hidden;border-radius:16rpx;background:#eaf0f8}.cover image{position:absolute;width:100%;height:100%}.cover-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#526784;font-size:30rpx}.cover-placeholder text{display:block}.card-title{font-weight:600;font-size:32rpx;margin:20rpx 0 10rpx;word-break:break-all}.card-meta{font-size:25rpx;color:#64748b}.card-action{margin-top:20rpx}.skeleton{background:linear-gradient(100deg,#e7ecf3,#f2f5f9,#e7ecf3);border-radius:12rpx}.skeleton-line{height:28rpx;margin-top:20rpx;width:70%}.skeleton-short{width:40%}.footer{text-align:center;color:#64748b;padding:28rpx;font-size:26rpx}.body-text{white-space:pre-wrap;word-break:break-all;line-height:1.85}.spaced{margin-top:24rpx}.status-removed{background:#f1f2f4;color:#64748b}.loading{color:#2f5597;font-size:28rpx}.count{text-align:right;color:#64748b;font-size:25rpx}.full{width:100%}
+page{background-color:#fbf6e9;background-image:radial-gradient(circle at 1rpx 1rpx,rgba(150,120,70,.055) 1rpx,transparent 0);background-size:20rpx 20rpx;color:#2b2622;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif;font-size:28rpx;line-height:1.65}
+view,text,button,input,textarea,image,scroll-view,swiper,swiper-item{box-sizing:border-box}
+.serif{font-family:"Songti SC","STSong","Noto Serif CJK SC","Source Han Serif SC","SimSun",serif}
+button{min-height:44px;line-height:1.4;padding:20rpx 28rpx;border:1rpx solid #e6d9bf;border-radius:8rpx;font-size:27rpx;background:#fffdf7;color:#4a4238;margin:0}
+button::after{border:0}
+button[disabled]{background:#f2ead8;color:#a99c86;border-color:#e6d9bf}
+button.primary{background:#8a5a2b;border-color:#8a5a2b;color:#fdf8ec;border-radius:44rpx;letter-spacing:.08em}
+button.danger{color:#b4472e;border-color:rgba(180,71,46,.38)}
+button.link{background:transparent;border-color:transparent;padding:14rpx;color:#8a5a2b;min-height:44px}
+.page{padding:32rpx;max-width:960rpx;margin:0 auto}
+.tab-page{padding-bottom:calc(160rpx + env(safe-area-inset-bottom))}
+.panel{background:#fffdf7;border:1rpx solid #e6d9bf;border-radius:6rpx;padding:28rpx;margin-bottom:24rpx}
+.row{display:flex;align-items:center;gap:16rpx}
+.between{justify-content:space-between}
+.wrap{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.muted{color:#6b6259;font-size:26rpx}
+.title{font-family:"Songti SC","STSong","Noto Serif CJK SC","Source Han Serif SC","SimSun",serif;font-size:44rpx;letter-spacing:.06em;line-height:1.4;word-break:break-all;font-weight:400}
+.subtitle{font-size:32rpx;font-weight:600}
+.section-title{font-family:"Songti SC","STSong","Noto Serif CJK SC","Source Han Serif SC","SimSun",serif;font-size:30rpx;letter-spacing:.22em;margin-bottom:20rpx}
+.field{margin-bottom:28rpx}
+.label{display:block;font-size:21rpx;letter-spacing:.3em;color:#9a8e78;margin-bottom:12rpx}
+input,textarea{background:#fffcf2;border:1rpx solid #d8c9ac;border-radius:6rpx;min-height:44px;padding:20rpx;width:100%;font-size:28rpx;color:#2b2622}
+textarea{height:280rpx;line-height:1.8}
+.field-error,.error{color:#b4472e;font-size:25rpx;word-break:break-all}
+.error-box{background:rgba(180,71,46,.06);border:1rpx solid #e8cfc6;border-left:4rpx solid rgba(180,71,46,.6);border-radius:4rpx;padding:22rpx;margin:20rpx 0;font-size:25rpx}
+.hint{color:#8c8272;font-size:23rpx;margin-top:10rpx;line-height:1.7}
+.state{padding:64rpx 24rpx;text-align:center}
+.state button{margin:24rpx auto 0;max-width:360rpx}
+.state-title{font-family:"Songti SC","STSong","Noto Serif CJK SC","Source Han Serif SC","SimSun",serif;font-size:32rpx;letter-spacing:.12em;margin-bottom:12rpx}
+.chip{display:inline-flex;align-items:center;background:rgba(230,217,191,.6);color:#7a5b33;border:1rpx dashed rgba(160,130,85,.5);border-radius:4rpx;padding:6rpx 16rpx;font-size:23rpx}
+.chip-button{border-radius:4rpx;border:1rpx dashed #c9ba9e;background:rgba(230,217,191,.55);color:#7a5b33;white-space:nowrap;flex-shrink:0;font-size:23rpx;padding:10rpx 18rpx;min-height:44px}
+.cover{width:100%;height:0;padding-bottom:56.25%;position:relative;overflow:hidden;border:1rpx solid #e6d9bf;background:#efe6d2}
+.cover image{position:absolute;width:100%;height:100%}
+.cover-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#8c8272;font-size:26rpx;letter-spacing:.1em}
+.cover-placeholder text{display:block}
+.card-title{font-family:"Songti SC","STSong","Noto Serif CJK SC","Source Han Serif SC","SimSun",serif;font-size:34rpx;letter-spacing:.04em;line-height:1.5;margin:18rpx 0 8rpx;word-break:break-all}
+.card-meta{font-size:23rpx;color:#6b6259;letter-spacing:.02em}
+.card-action{margin-top:18rpx;gap:12rpx}
+.card-action button{font-size:24rpx}
+.skeleton{background:linear-gradient(100deg,#efe6d2,#f8f2e4,#efe6d2);border-radius:4rpx}
+.skeleton-line{height:24rpx;margin-top:18rpx;width:70%}
+.skeleton-short{width:40%}
+.footer{text-align:center;color:#8c8272;padding:28rpx;font-size:23rpx;letter-spacing:.14em}
+.body-text{white-space:pre-wrap;word-break:break-all;line-height:1.9;font-size:28rpx;color:#3b342b}
+.spaced{margin-top:24rpx}
+.status-removed{background:#efe6d2;color:#8c8272}
+.loading{color:#8a5a2b;font-size:26rpx}
+.count{text-align:right;color:#a99c86;font-size:22rpx;font-variant-numeric:tabular-nums}
+.full{width:100%}
+.rating{color:#8a5a2b;font-size:24rpx;font-variant-numeric:tabular-nums}
+.stamp{display:inline-flex;align-items:center;border:1rpx solid rgba(194,112,58,.7);color:#c2703a;border-radius:4rpx;padding:2rpx 12rpx;font-size:20rpx;letter-spacing:.16em;background:rgba(194,112,58,.05)}
+.hair{height:1rpx;background-image:repeating-linear-gradient(90deg,#d9cbb0 0rpx,#d9cbb0 20rpx,transparent 20rpx,transparent 32rpx)}
+.rule-thick{height:3rpx;background:#2b2622;opacity:.8;margin:16rpx 0 0}
+.rule-thin{height:1rpx;background:#2b2622;opacity:.25;margin:3rpx 0 0}

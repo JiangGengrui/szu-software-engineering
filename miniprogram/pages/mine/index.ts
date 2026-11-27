@@ -8,13 +8,38 @@ import { goLogin } from '../../core/source';
 import { ApiError, errorMessage } from '../../core/transport';
 import { MyWorkCard, PageResult, TapEvent } from '../../core/types';
 Page({
-  data: { username: '', ready: false, checking: true, loading: false, list: [] as ReturnType<typeof myCard<MyWorkCard>>[], error: '', actionError: '', done: false, total: 0, deleting: 0, mediaFailures: {} as Record<string, boolean>, resolvedCovers: {} as Record<number, string> },
+  data: { username: '', ready: false, checking: true, loading: false, list: [] as ReturnType<typeof myCard<MyWorkCard>>[], groups: [] as { label: string; items: ReturnType<typeof myCard<MyWorkCard>>[] }[], error: '', actionError: '', done: false, total: 0, deleting: 0, mediaFailures: {} as Record<string, boolean>, resolvedCovers: {} as Record<number, string> },
   pager: new Pager<MyWorkCard>(10), prompted: false, generation: 0,
-  onShow() { selectTab(this, 'mine'); void this.refresh(); },
+  onShow() { selectTab(this, 'mine'); void (this.data.ready ? this.softRefresh() : this.refresh()); },
   onUnload() { this.generation++; this.pager.reset(); },
-  onPullDownRefresh() { void this.refresh(); },
+  onPullDownRefresh() { void (this.data.ready ? this.softRefresh() : this.refresh()); },
   onReachBottom() { void this.loadMore(); },
-  sync() { const resolved = this.data.resolvedCovers; this.setData({ list: this.pager.list.map(work => { const card = myCard(work); return resolved[work.id] ? { ...card, cover: resolved[work.id] } : card; }), loading: this.pager.loading, error: this.pager.error, done: this.pager.done, total: this.pager.total }); },
+  sync() {
+    const resolved = this.data.resolvedCovers;
+    const list = this.pager.list.map(work => { const card = myCard(work); return resolved[work.id] ? { ...card, cover: resolved[work.id] } : card; });
+    const groups: { label: string; items: typeof list }[] = [];
+    for (const card of list) {
+      const key = (card.activity_date || '').slice(0, 7);
+      const label = /^\d{4}-\d{2}$/.test(key) ? `${key.slice(0, 4)} 年 ${Number(key.slice(5, 7))} 月` : '未标注日期';
+      const last = groups[groups.length - 1];
+      if (last && last.label === label) last.items.push(card); else groups.push({ label, items: [card] });
+    }
+    this.setData({ list, groups, loading: this.pager.loading, error: this.pager.error, done: this.pager.done, total: this.pager.total });
+  },
+  async softRefresh() {
+    const ticket = this.pager.reload(); if (!ticket) { wx.stopPullDownRefresh(); return; }
+    const generation = ++this.generation; this.sync();
+    try {
+      const user = await auth.confirm(); if (generation !== this.generation) return;
+      if (!user) { this.pager.reset(); this.sync(); this.setData({ checking: false, ready: false, username: '' }); return; }
+      this.setData({ username: user.username });
+      this.pager.resolve(ticket, await api<PageResult<MyWorkCard>>('/api/works/mine?page=1&page_size=10', { protected: true, source: { page: 'mine' } }));
+    } catch (error) {
+      if (generation !== this.generation) return;
+      this.pager.reject(ticket, errorMessage(error));
+      if (error instanceof ApiError && error.status === 401) { this.pager.reset(); this.setData({ ready: false, username: '' }); }
+    } finally { if (generation === this.generation) this.sync(); wx.stopPullDownRefresh(); }
+  },
   async refresh() {
     const generation = ++this.generation; this.pager.reset(); this.sync(); this.setData({ checking: true, ready: false, username: '', mediaFailures: {}, resolvedCovers: {} });
     try {

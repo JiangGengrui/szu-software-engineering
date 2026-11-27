@@ -1,1 +1,1 @@
-<view class="tab-bar"><button wx:for="{{items}}" wx:key="page" class="tab {{selected === item.page ? 'active' : ''}}" data-page="{{item.page}}" bindtap="choose" aria-label="{{item.label}}"><text class="symbol">{{item.symbol}}</text><text>{{item.label}}</text></button></view>
+<view class="tab-bar"><view wx:for="{{items}}" wx:key="page" class="tab {{selected === item.page ? 'active' : ''}}" data-page="{{item.page}}" bindtap="choose" aria-label="{{item.label}}"><view class="tab-icon tab-icon--{{item.icon}}"/><text class="tab-label">{{item.label}}</text></view></view>

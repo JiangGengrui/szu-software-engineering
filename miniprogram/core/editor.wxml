@@ -1,1 +1,46 @@
-<view class="page {{editing ? '' : 'tab-page'}}"><view class="title editor-heading">{{editing ? '编辑作品' : '发布校园记录'}}</view><view wx:if="{{loading}}" class="panel state loading">正在确认身份与作品状态…</view><view wx:elif="{{blocked}}" class="panel state"><view class="state-title">{{blocked}}</view><text class="muted">没有可用的编辑权限，不会保存任何修改</text><button bindtap="enter">刷新状态</button></view><view wx:elif="{{!ready}}" class="panel state"><view class="state-title">登录后才能{{editing ? '编辑' : '发布'}}</view><view wx:if="{{error}}" class="error">{{error}}</view><text class="muted">游客仍可浏览首页，登录后不会自动提交</text><button class="primary" bindtap="login">去登录</button><button class="link" bindtap="enter">重试身份确认</button></view><block wx:else><view class="panel"><view class="field"><text class="label">标题（可选）</text><input value="{{form.title}}" maxlength="-1" data-field="title" bindinput="input" disabled="{{busy}}" placeholder="给这段校园记忆起个名字"/><view class="count">{{titleCount}} / 50</view><text wx:if="{{field === 'title'}}" class="field-error">{{error}}</text></view><view class="field"><text class="label">正文</text><textarea value="{{form.content}}" maxlength="-1" data-field="content" bindinput="input" disabled="{{busy}}" placeholder="分享活动、现场与心情；有图片/视频时可不填正文"/><view class="count">{{count}} / 2000（按Unicode码点）</view><text wx:if="{{field === 'content'}}" class="field-error">{{error}}</text></view><view class="field"><text class="label">图片或视频</text><view class="row"><button class="grow" disabled="{{busy}}" bindtap="pickImages">选择图片 · 最多9张</button><button class="grow" disabled="{{busy}}" bindtap="pickVideo">选择视频 · 1个</button></view><view class="hint">原图JPG/JPEG/PNG，每张≤10MB；MP4视频≤50MB。图片与视频互斥，重新选择会整体替换本次选择。</view><view wx:if="{{editing && !form.files.length}}" class="hint">未选择新媒体：保留已保存的媒体，不提供清空旧媒体功能。</view><view class="preview-list"><block wx:for="{{previews}}" wx:key="url"><image wx:if="{{item.kind === 'image'}}" class="preview-image" src="{{item.url}}" mode="widthFix" data-value="{{item.url}}" bindtap="preview" binderror="mediaFailed"/><video wx:else class="preview-video" src="{{item.url}}" controls object-fit="contain" binderror="mediaFailed"/><text class="hint">{{index === 0 && item.kind === 'image' ? '第1张 · 列表封面' : item.kind === 'image' ? '第' + (index + 1) + '张' : '视频预览'}}</text></block></view><button wx:if="{{form.files.length}}" class="link" disabled="{{busy}}" bindtap="cancelSelection">取消本次媒体选择{{editing ? '，恢复保留旧媒体' : ''}}</button><view wx:if="{{mediaError}}" class="error">{{mediaError}}</view><text wx:if="{{field === 'files'}}" class="field-error">{{error}}</text></view><view class="field"><text class="label">标签</text><view class="row"><input class="grow" value="{{tagInput}}" maxlength="-1" bindinput="tagInputChange" disabled="{{busy}}" placeholder="输入1—10字标签，可创建新标签"/><button disabled="{{busy}}" bindtap="addTag">添加</button></view><view class="row wrap spaced"><button wx:for="{{form.tags}}" wx:key="*this" class="chip-button" data-index="{{index}}" disabled="{{busy}}" bindtap="removeTag">{{item}} ×</button></view><view class="hint">最多5个，区分大小写；点击标签可取消</view><text wx:if="{{field === 'tags'}}" class="field-error">{{error}}</text></view><view class="field"><text class="label">活动日期</text><picker mode="date" value="{{form.activity_date}}" end="{{today}}" disabled="{{busy}}" bindchange="dateChange"><button disabled="{{busy}}">{{form.activity_date}} · 选择日期</button></picker><view class="hint">以北京时间今天为上限，与作品发布时间不同</view><text wx:if="{{field === 'activity_date'}}" class="field-error">{{error}}</text></view><view wx:if="{{error}}" class="error-box">{{error}}</view><view wx:if="{{progress}}" class="upload-status">{{progress}}</view><button class="primary" loading="{{busy}}" disabled="{{busy}}" bindtap="submit">{{busy ? '处理中，请勿重复提交' : editing ? '保存修改' : '发布作品'}}</button><view class="hint spaced">正文或媒体至少一项。未提交内容仅留在当前页面内存，不创建持久草稿。</view><button wx:if="{{error || uncertain}}" class="link" loading="{{checking}}" disabled="{{busy || checking}}" bindtap="checkResult">先查询我的最新作品，核对提交结果</button></view><view wx:if="{{latestChecked}}" class="panel"><view class="section-title">服务端最新作品（前10条）</view><view class="hint">请人工核对是否已保存，再决定是否重试；不会自动再次提交。</view><view wx:if="{{!latest.length}}" class="muted">暂无作品</view><button wx:for="{{latest}}" wx:key="id" class="result-row link" data-id="{{item.id}}" bindtap="openResult">#{{item.id}} {{item.label}} · {{item.stateText}}</button></view></block></view>
+<view class="page {{editing ? '' : 'tab-page'}} editor-page">
+  <view class="editor-head serif">{{editing ? '编辑作品' : '发布校园记录'}}</view>
+  <view class="editor-sub">CAMPUS ALBUM · {{editing ? 'EDIT' : 'NEW'}}</view>
+
+  <view wx:if="{{loading}}" class="panel state loading">正在确认身份与作品状态…</view>
+  <view wx:elif="{{blocked}}" class="panel state"><view class="state-title">{{blocked}}</view><text class="muted">没有可用的编辑权限，不会保存任何修改</text><button bindtap="enter">刷新状态</button></view>
+  <view wx:elif="{{!ready}}" class="panel state"><view class="state-title">登录后才能{{editing ? '编辑' : '发布'}}</view><view wx:if="{{error}}" class="error">{{error}}</view><text class="muted">游客仍可浏览首页，登录后不会自动提交</text><button class="primary" bindtap="login">去登录</button><button class="link" bindtap="enter">重试身份确认</button></view>
+
+  <block wx:else>
+    <view wx:if="{{progress}}" class="upload-status"><text class="upload-dot"/><text>冲洗中 · {{progress}}</text></view>
+
+    <view class="thumbs">
+      <block wx:for="{{previews}}" wx:key="url">
+        <view wx:if="{{item.kind === 'image'}}" class="thumb"><view class="thumb-box"><image class="thumb-img" src="{{item.url}}" mode="aspectFill" data-value="{{item.url}}" bindtap="preview" binderror="mediaFailed"/><text class="thumb-no">{{index === 0 ? '封面' : index + 1}}</text></view></view>
+        <view wx:else class="thumb thumb-wide"><view class="thumb-box thumb-video-box"><video class="preview-video" src="{{item.url}}" controls object-fit="contain" binderror="mediaFailed"/><text class="thumb-no">视频</text></view></view>
+      </block>
+      <view class="thumb" bindtap="pickImages"><view class="thumb-box thumb-add"><text class="thumb-plus">+</text><text class="thumb-add-label">图片</text></view></view>
+      <view class="thumb" bindtap="pickVideo"><view class="thumb-box thumb-add"><text class="thumb-plus">▷</text><text class="thumb-add-label">视频</text></view></view>
+    </view>
+    <view class="hint">原图JPG/JPEG/PNG，每张≤10MB；MP4视频≤50MB。图片与视频互斥，重新选择会整体替换本次选择。</view>
+    <view wx:if="{{editing && !form.files.length}}" class="hint">未选择新媒体：保留已保存的媒体，不提供清空旧媒体功能。</view>
+    <button wx:if="{{form.files.length}}" class="link" disabled="{{busy}}" bindtap="cancelSelection">取消本次媒体选择{{editing ? '，恢复保留旧媒体' : ''}}</button>
+    <view wx:if="{{mediaError}}" class="error">{{mediaError}}</view>
+    <text wx:if="{{field === 'files'}}" class="field-error">{{error}}</text>
+
+    <view class="field titled spaced"><text class="label">标题（可选）</text><input value="{{form.title}}" maxlength="-1" data-field="title" bindinput="input" disabled="{{busy}}" placeholder="给这段校园记忆起个名字"/><view class="count">{{titleCount}} / 50</view><text wx:if="{{field === 'title'}}" class="field-error">{{error}}</text></view>
+
+    <view class="field titled"><text class="label">正文</text><textarea class="paper-input" value="{{form.content}}" maxlength="-1" data-field="content" bindinput="input" disabled="{{busy}}" placeholder="分享活动、现场与心情；有图片/视频时可不填正文"/><view class="count">{{count}} / 2000（按Unicode码点）</view><text wx:if="{{field === 'content'}}" class="field-error">{{error}}</text></view>
+
+    <view class="field titled"><text class="label">标签</text><view class="row"><input class="grow" value="{{tagInput}}" maxlength="-1" bindinput="tagInputChange" disabled="{{busy}}" placeholder="输入1—10字标签，可创建新标签"/><button disabled="{{busy}}" bindtap="addTag">添加</button></view><view class="row wrap spaced tags-row"><view wx:for="{{form.tags}}" wx:key="*this" class="chip-button" data-index="{{index}}" bindtap="removeTag">{{item}} ×</view></view><view class="hint">最多5个，区分大小写；点击标签可取消</view><text wx:if="{{field === 'tags'}}" class="field-error">{{error}}</text></view>
+
+    <view class="field titled"><text class="label">活动日期</text><picker mode="date" value="{{form.activity_date}}" end="{{today}}" disabled="{{busy}}" bindchange="dateChange"><view class="date-field"><text class="serif">{{form.activity_date}}</text><text class="date-caret">选择</text></view></picker><view class="hint">以北京时间今天为上限，与作品发布时间不同</view><text wx:if="{{field === 'activity_date'}}" class="field-error">{{error}}</text></view>
+
+    <view wx:if="{{error}}" class="error-box">{{error}}</view>
+    <button class="primary full submit" loading="{{busy}}" disabled="{{busy}}" bindtap="submit">{{busy ? '处理中，请勿重复提交' : editing ? '保存修改' : '发布作品'}}</button>
+    <view class="hint editor-note">正文或媒体至少一项。未提交内容仅留在当前页面内存，不创建持久草稿。</view>
+    <button wx:if="{{error || uncertain}}" class="link" loading="{{checking}}" disabled="{{busy || checking}}" bindtap="checkResult">先查询我的最新作品，核对提交结果</button>
+
+    <view wx:if="{{latestChecked}}" class="panel">
+      <view class="section-title">服务端最新作品（前10条）</view>
+      <view class="hint">请人工核对是否已保存，再决定是否重试；不会自动再次提交。</view>
+      <view wx:if="{{!latest.length}}" class="muted">暂无作品</view>
+      <view wx:for="{{latest}}" wx:key="id" class="result-row" data-id="{{item.id}}" bindtap="openResult">#{{item.id}} {{item.label}} · {{item.stateText}}</view>
+    </view>
+  </block>
+</view>

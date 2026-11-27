@@ -500,3 +500,100 @@
 - 结构校验：修改后运行`node scripts/check-traceability.mjs .`，退出0；31 R、157 AC、157 T、11 E、108执行/108通过/0失败/49未验证。
 - 边界：本次仅文档同步，未连接真机、未改代码/配置、未执行上传或性能；`core/config.ts`仍为127.0.0.1，真机运行前需改为电脑局域网IP（后续变更单独记录并重跑Gm）。
 - 记录人：Qoder，根据用户2026-11-24选择A方案及官方微信网络文档记录。
+
+## 2026-11-26 变更 040 — 面向用户体验的实现层优化（不改变业务契约）
+
+- 类型：实现层性能与体验优化、测试同步；SPEC/AC/ARCHITECTURE 的业务规则与接口契约未变更。
+- 原因：排查发现四处直接影响用户的问题——JPEG 结构校验逐字节扫描（本机实测 0.811s/10MB，9 张即超出 AC-133 的 5s）；9×10MB 上传在小程序端先全量读入再复制成单缓冲（峰值约 180MB）；登录在全局写门内执行 PBKDF2（实测 0.29s/次，串行并阻塞其它写入）；首页/我的每次 onShow 重置列表、详情每次 onShow 全量重载（骨架闪烁、滚动回顶、重复请求）。
+- 改动：
+  - `backend/album/media.py`：JPEG 熵段改为跳到下一个 `0xFF`，stuffed/RST/EOI 判定顺序不变；媒体 GET 由 3 次主键查询合并为 1 次 outer join，1004/1010 判定顺序不变。实测 10MB 熵段校验 0.811s→0.001s；新旧实现对 11 个结构样本与 2000 个随机变异样本共 2011 例判定一致（0 分歧）。
+  - `backend/album/auth.py`：登录改为只读事务；注册的 PBKDF2 在进入写事务前完成，锁内只保留唯一性与插入。PBKDF2-HMAC-SHA256 600000 轮、独立盐、dummy 哈希、token_version 撤销均未变。
+  - `backend/album/common.py`、`__init__.py`：新增 `MAX_JSON_LENGTH=64KiB`（仅 JSON 命令生效）；`/static/*` 的 200 响应允许 `public, max-age=300`，`/media` 与 API 继续 `no-store`。
+  - `miniprogram/core/multipart.ts`、`media.ts`、`editor-page.ts`：multipart 改为异步、按选择顺序逐文件读入同一目标缓冲，峰值由约 180MB 降到约 100MB；字段/边界/尺寸校验信息保留。
+  - `miniprogram/core/auth.ts`：`/me` 确认增加 60 秒窗口；写请求仍由服务端在写门内校验，凭据撤销最多延迟一个窗口。
+  - `miniprogram/core/paging.ts` 与 home/mine/detail：新增“保留可见列表的重新读取”，返回页面不再闪骨架或回顶；筛选变更仍走原重置路径；详情回前台只做静默复查，已加载正文与评论草稿保持不动。
+  - 样式：辅助文字 `#64748b`/`#6b778c` → `#5a6b80`（对比度 4.40→5.04），主色与 44px 触达不变。
+  - `tests/test_media.py` 新增大熵段 JPEG 用例；`tests-node` 适配异步 multipart，保留顺序读取、精确尺寸复查与边界冲突断言；配置断言放宽为 RFC1918 私网地址，因 D-025 已把默认地址改为局域网 IP（`core/config.ts` 的本机改动早于本轮，未由本轮修改）。
+- 未采纳：未知异常 500 改 JSON 与 traceback 日志。前者与 `test_reliability` 的“500 非 JSON”断言及既有错误壳约定冲突，后者与 AGENTS §2“日志仅请求ID、路由模板、状态码、耗时”冲突；两者需另行裁决。
+- 校验：`npm run check:all` 退出0，证据 `evidence/checks-2026-11-26T15-05-43-083Z`；后端370项、前端与工具200项、追溯108执行/108通过/0失败/49未验证。
+- 边界：未启动浏览器、未连接真机、未执行20客户端与2s/5s计时；本轮不是G5，不改变任何T结论。ACCEPTANCE 的 E-01/E-02 仍绑定 2026-11-22 证据，待下轮验收统一重绑。
+- 记录人：Qoder，根据用户“按照落地顺序开始”的指令与本轮实测输出记录。
+
+## 2026-11-27 变更 044 — 按D-025固化真机验收清单与证据模板
+
+- 类型：验收准备文档；不改代码、契约或任何T结论。
+- 原因：用户要求按D-025固化真机验收清单与证据模板，使设备就绪后可直接执行并留证。
+- 改动：
+  - 新增`checklists/DEVICE.md`：固定环境表（工具2.02.2609250、基础库3.18.0、iOS/Android真机、调试开关、局域网`--host 0.0.0.0`、禁止127.0.0.1、共享`urlCheck=true`与private配置分工、iOS明文被拦时自签HTTPS兜底）、会话元数据、8项预检、A—G七组逐T操作与判据（T-62/63/70/71/73/76/77/84/89/91/92/112/113/132/133/134/136/143/145/148/149/161/142）、留证命名、判定规则与收尾。
+  - 新增`checklists/DEVICE-EVIDENCE-TEMPLATE.md`：会话元数据、环境勾选、逐T结果、上传边界、性能原始值、演示时间线、失败缺陷与双人签署；明确复制到`evidence/device-<时间戳>-<机型>/`后填写，未记录项即未验证。
+  - PLAN §1与P-21/P-27/P-29、ACCEPTANCE §2.3补充执行入口与留证要求。
+- 未采纳：预填任何真机结果或性能数值；用单机/接口耗时折算20客户端。
+- 校验：`node scripts/check-traceability.mjs .` 退出0（163/113/50，E=13）；本次为文档新增，未改代码，不重跑业务测试。
+- 边界：清单与模板不是证据，也不改变未验证计数；真机主链路、上传边界、性能与演示仍未执行，G5未通过。
+- 记录人：Qoder，根据用户“按 D-025 固化真机验收清单与证据模板”的指令记录。
+
+## 2026-11-27 变更 043 — SPEC 0.4 / ARCHITECTURE 0.2 独立复核与P1修订
+
+- 类型：独立复核、文档修订与小范围实现补齐；不新增业务能力。
+- 原因：用户要求对第二批优化后的 SPEC 0.4（新增AC-158～AC-163、改写AC-57/AC-145）与 ARCHITECTURE 0.2 做独立复核。审查者未参与本轮生产，首次结论为“条件通过”（P0=0、P1=7、P2=13）。
+- 改动（按P1逐项）：
+  - ARCHITECTURE ADR-05 改为“逐文件暂存+引用提交（保留单请求multipart兼容）/放弃新增暂存表与按客户端路径定位”，并写明每文件一次请求、1小时TTL后果；§6客户端契约、§7超时表、§2.1第3步、§5.2第5步、§4.2失败码（补1005）、实体表（补seed_key）、增量升级说明、上传持锁风险、摘要中的会话上限同步。
+  - 后台预览：`AdminWorkRow` 新增 `media_url`（首个有效媒体的`/media/{id}`，removed为null），`templates/works.html` 的缩略图链接改为打开原媒体、`img.src` 仍用封面；`tests/test_admin.py` 增加href断言；`tests/test_media.py` 增加“替换媒体未提交新封面时cover_url回落首图、旧封面入口1004、移除后1010”断言。
+  - SPEC：AC-159分入口写错误码，AC-160补409/1005与400/1001，AC-161改为可证伪表述，AC-133与T-133补逐文件上传总耗时口径，AC-158注明锁定检查先于账号状态，§4.9补双向控制字符与制表符折叠口径，§4引言与§1.2决策范围同步。
+  - ACCEPTANCE 0.17：T-133/T-158/T-161/T-162文字同步，E-01～E-13，§5.1登记复核结论；GATES新增“G1/G3复核”节并更新汇总表。
+- 未采纳：重跑Chrome157/Edge157四版本矩阵（旧版可执行文件不在本机）；为残留P2（`.gitignore`排除tests/evidence、封面分支独立用例）扩大范围。
+- 校验：`node scripts/check-admin-browser.cjs` 退出0，`evidence/admin-browser-2026-11-26T16-12-05-116Z`（Chrome158.0.8127.37、Edge158.0.4370.33各34/34）；`npm run check:all` 退出0，`evidence/checks-2026-11-26T16-12-31-102Z`（后端386项、前端与工具202项、追溯163/163覆盖、113执行、0失败、50未验证）；审查者复跑ruff/mypy/pytest/traceability/npm test均通过。
+- 结论：G1（SPEC 0.4）通过、G3（ARCHITECTURE 0.2）通过；P0=0、P1=0、残留8项P2不阻断。不是G5裁决，真机主链路、20客户端性能、课堂演示与独立G5仍未执行。
+- 记录人：Qoder，根据用户“启动独立复核”的指令与审查者报告记录；闸门结论来自审查者，作者未自评。
+
+## 2026-11-26 变更 042 — 后台媒体预览真实浏览器补证与文档收尾
+
+- 类型：验收证据补充与文档同步；不改业务契约（SPEC 0.4/ARCHITECTURE 0.2文字未变）、不改后端与小程序行为。
+- 原因：变更041后T-162仅有pytest解析HTML，缺真实渲染证据；ARCHITECTURE仍写“SPEC 0.3/157AC”“独立30分钟Session”，PLAN任务未挂AC-158～AC-163。
+- 改动：
+  - `scripts/check-admin-browser.cjs`：作品表头断言增加“媒体”列；在禁用作者前用visible图片作品断言`img.thumb`已加载（`naturalWidth>0`）且`href`等于原媒体地址；removed行断言显示“已移除，不可访问”且无缩略图。新增2条断言，四版本脚本项数由32增至34。
+  - `ACCEPTANCE.md` 0.15→0.16：T-162转通过（E-13），计数113/163、0失败、50未验证；E-12改指本轮最终检查目录并新增E-13。
+  - `ARCHITECTURE.md`：需求输入改为SPEC 0.4/163AC并注明0.4待复核；ADR-04改为“30分钟空闲滑动+8小时绝对上限”；S4核对项补注新AC已补入PLAN对应列。
+  - `PLAN.md`：P-05/P-07/P-08/P-19补挂AC-158～AC-163，P-19完成判据同步滑动会话；README、story、PLAN计数改为113/163、50未验证。
+- 未采纳：重装Chrome157或Chrome for Testing 158以复跑四版本矩阵；旧版可执行文件与便携版已不在本机，T-135仍以E-03历史回执为准，本轮不声称重跑四版本。
+- 校验：`node scripts/check-admin-browser.cjs` 退出0，证据 `evidence/admin-browser-2026-11-26T15-51-57-700Z`（Chrome158.0.8127.37、Edge158.0.4370.33各34/34）；`npm run check:all` 退出0，证据 `evidence/checks-2026-11-26T15-53-55-136Z`（后端386项、前端与工具202项、追溯结构退出0）。
+- 边界：T-161缩略封面仍需真机压缩与列表渲染证据；真机主链路、20客户端性能、课堂演示与独立G5均未执行。SPEC 0.4与ARCHITECTURE 0.2仍需独立复核，G1/G3/G5不得据此宣告通过。
+- 记录人：Qoder，根据用户“继续下一步规划”的选择与上述实际执行输出记录。
+
+## 2026-11-26 变更 041 — 逐文件上传、缩略封面、标签清洗、登录锁定与管理会话滑动（D-026～D-029）
+
+- 类型：业务契约变更（SPEC 0.3→0.4，新增AC-158～AC-163，改写AC-57、AC-145）与实现、迁移、测试同步；ARCHITECTURE 0.1→0.2，ACCEPTANCE 0.14→0.15。
+- 原因：用户同意第二批四项优化——客户端生成缩略封面、上传改为逐文件、标签清洗并对普通用户登录按账号锁定、后台作品媒体预览与会话滑动续期。四项均触及已冻结契约，先按A1/A5记录裁决D-026～D-029，再改代码与文档。
+- 改动：
+  - `backend/album/models.py`、`__init__.py`：`User` 增加 `login_failures`、`login_locked_until`，`Work` 增加 `cover_key`、`cover_mime`、`cover_size`；应用工厂在 `create_all` 后执行带 `PRAGMA table_info` 守卫的 `ALTER TABLE`，只补缺失列，不改写或删除任何行，因此现有实例可直接升级。
+  - `backend/album/common.py`：`clean_tag` 移除零宽/软连字符/C0-C1控制字符并把内部连续空白折叠为一个空格；`tag_names` 在发布、编辑、查询共用同一规范。
+  - `backend/album/auth.py`：普通用户登录增加按账号5次失败锁300秒（成功清零、到期后从1重计、未知用户名不写状态），PBKDF2 仍在写门之外执行；管理会话改为30分钟空闲滑动 + 签发后8小时绝对上限，`ADMIN_SESSION_IDLE`/`ADMIN_SESSION_ABSOLUTE` 可配置。
+  - `backend/album/media.py`：新增 `POST /api/uploads` 逐文件暂存（键 `u{上传者id}-{uuid}.{ext}`，仅本人可引用）、`GET /media/cover/{work_id}` 同源封面（与媒体相同的可见性检查与 `no-store`）；启动清理把 `Work.cover_key` 计入引用集，并只清理超过1小时且无引用的暂存文件。
+  - `backend/album/work.py`：发布/编辑支持 `media_keys`（JSON数组）与 `cover_key` 引用暂存文件，与multipart文件互斥；A/B/C/D短路顺序、媒体保留与替换语义不变；`cover_url` 优先指向封面路由，否则回退首图。
+  - `backend/album/templates/works.html`、`static/admin.css`：作品管理增加媒体列，visible作品显示72×54缩略图并可打开原媒体，removed作品显示不可访问且不渲染缩略图。
+  - `miniprogram/core/validation.ts`、`presentation.ts`、`multipart.ts`、`media.ts`、`editor-page.ts`：标签使用同一清洗函数；`/media/cover/{id}` 可被 `mediaUrl` 识别；提交改为逐文件上传后引用，按文件显示进度；首张图片用 `wx.compressImage` 生成≤512KiB封面，压缩或封面上传失败只回退首图，不阻断发布。
+  - 测试：后端新增15例（登录锁定3、标签清洗1、暂存引用6、封面2、会话滑动1、后台预览1、重启清理2，另改写既有会话过期用例）；`tests-node` 的发布/编辑用例改断逐文件上传与引用，新增标签清洗与封面/单文件上传用例，前端与工具由200项增至202项。
+- 未采纳：服务端解码缩略图（D-003未授权Pillow）；暂存上传新增数据表；`media_keys: []` 作为清空媒体（不新增该能力）；取消管理会话绝对上限。
+- 校验：`npm run check:all` 退出0，证据 `evidence/checks-2026-11-26T15-35-06-516Z`；后端386项通过（覆盖率97%）、前端与工具202项通过、追溯163/163覆盖、112执行/112通过/0失败/51未验证。
+- 边界：未启动真实浏览器、未连接真机、未执行20客户端与2s/5s计时；T-161（缩略封面）与T-162（后台预览）因缺真机压缩与浏览器渲染证据保持未验证。SPEC 0.4新增条款、ARCHITECTURE 0.2尚未由未参与生产的上下文独立复核，G1/G3不得据此宣告通过；G5未通过。
+- 记录人：Qoder，根据用户“同意”与“按照落地顺序开始”的指令及本轮实测输出记录。
+
+## 2026-11-27 变更 044 — 相纸质视觉改版与首页相纸翻页（D-030）
+
+- 类型：表现层改版 + 首页信息结构变更；接口、数据模型、错误码与业务规则不变。
+- 原因：用户指出小程序界面仅为功能验证样式，要求先出设计预览再实施；在对比两个已渲染方向后选定“相纸质”，并明确首页采用翻页形式、tabBar 使用内联 SVG 图标、字体按系统宋体栈方案。
+- 已确认：方向A相纸质（纸底 #FBF6E9、相纸白框 #FFFDF7、焦糖 #C2703A、深棕 #8A5A2B、危险 #B4472E）；首页默认一屏一张左右翻页且保留列表视图切换；tabBar 图标用 WXSS 内联 SVG data-URI，不新增图标库或图片文件；标题用系统宋体栈（iOS Songti SC），Android 回退无衬线，不引入网络字体。
+- 影响：
+  - DECISIONS.md：新增 D-030，记录方向选择、放弃项、边界与下游影响。
+  - SPEC.md：AC-22/AC-25/AC-26 措辞改为同时覆盖相纸翻页视图与列表视图；集合、created_at 倒序、默认10条分页与卡片字段语义不变。
+  - ACCEPTANCE.md：T-25/T-26 的步骤与断言补充翻页视图，两行仍为未验证并注明改版后须重跑。
+  - miniprogram/app.wxss、app.json：重建设计令牌（纸底、相框边、宋体标题类、按钮与面板、虚线分隔）与窗口/自定义 tabBar 配色。
+  - miniprogram/custom-tab-bar：items 由字符符号改为 icon 键，WXML 改用 view 图标块，WXSS 内联 6 份 SVG base64（常态/选中两色）。
+  - miniprogram/pages/home：WXML/WXSS 改为刊头 + 筛选胶囊 + 相纸卡 swiper + 页码；index.ts 新增 view/current 与 swipe/toggleView，sync 内夹取 current，滑至末页前两页触发 loadMore；分页、筛选、图片失败回退与错误处理未改。
+  - miniprogram/pages/mine：新增按月分组的 groups 视图数据（list 与分页语义不变），改为双列相册墙 + 月份分隔 + 每格查看/编辑/删除。
+  - miniprogram/pages/detail、login、settings、core/editor：WXML/WXSS 重排为相纸风格，绑定事件、dataset 字段与数据字段名未改。
+  - tests-node/mini-pages.test.cjs：全局样式断言由旧品牌色 #2f5597 改为新令牌 #8a5a2b，并补充 tabBar 强调色断言（不改变任何行为断言）。
+- 未采纳：引入图标库或 PNG 图标切图；用 wx.loadFontFace 加载网络字体（需新增 CDN 域名，超出 D-003 授权）；暗房胶片方向。
+- 校验：`npm run lint`、`npm run typecheck`、`npm test`（202 项通过）、`node scripts/check-traceability.mjs .`（结构通过，163/163 覆盖、113 执行、50 未验证）实际执行退出 0；后端代码未改动。
+- 边界：本轮未在微信开发者工具或真机渲染；宋体回退、SVG 图标渲染、swiper 首屏性能与文本对比度须按 D-025 在 iOS/Android 真机复验；SPEC 措辞变更需独立复核，不因本轮自测宣告 G1/G5 通过。
+- 记录人：CodeBuddy，根据用户 2026-11-27 的方向确认与“图标选取B、字体按照上面的方案”指令记录。

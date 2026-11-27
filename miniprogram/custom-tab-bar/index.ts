@@ -1,6 +1,6 @@
 import { leaveTab } from '../core/leave';
 Component({
-  data: { selected: '', items: [{ page: 'home', label: '首页', symbol: '⌂' }, { page: 'publish', label: '发布', symbol: '+' }, { page: 'mine', label: '我的', symbol: '○' }] },
+  data: { selected: '', items: [{ page: 'home', label: '首页', icon: 'home' }, { page: 'publish', label: '发布', icon: 'publish' }, { page: 'mine', label: '我的', icon: 'mine' }] },
   lifetimes: { attached() { this.update(); } },
   pageLifetimes: { show() { this.update(); } },
   methods: {

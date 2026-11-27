@@ -1,7 +1,7 @@
 {
   "pages": ["pages/home/index", "pages/login/index", "pages/detail/index", "pages/publish/index", "pages/mine/index", "pages/settings/index", "pages/edit/index"],
-  "window": { "navigationBarTitleText": "校园影集", "navigationBarBackgroundColor": "#2F5597", "navigationBarTextStyle": "white", "backgroundColor": "#F4F6FA", "backgroundTextStyle": "dark" },
-  "tabBar": { "custom": true, "color": "#64748B", "selectedColor": "#2F5597", "backgroundColor": "#FFFFFF", "list": [{"pagePath": "pages/home/index", "text": "首页"}, {"pagePath": "pages/publish/index", "text": "发布"}, {"pagePath": "pages/mine/index", "text": "我的"}] },
+  "window": { "navigationBarTitleText": "校园影集", "navigationBarBackgroundColor": "#FBF6E9", "navigationBarTextStyle": "black", "backgroundColor": "#FBF6E9", "backgroundTextStyle": "dark" },
+  "tabBar": { "custom": true, "color": "#8C8272", "selectedColor": "#C2703A", "backgroundColor": "#FFFDF7", "list": [{"pagePath": "pages/home/index", "text": "首页"}, {"pagePath": "pages/publish/index", "text": "发布"}, {"pagePath": "pages/mine/index", "text": "我的"}] },
   "style": "v2",
   "lazyCodeLoading": "requiredComponents"
 }

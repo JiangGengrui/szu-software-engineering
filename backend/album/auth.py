@@ -2,6 +2,7 @@
 import re
 import secrets
 from datetime import UTC, timedelta
+from math import ceil
 from typing import Any
 
 from flask import Blueprint, current_app, request, session
@@ -10,11 +11,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .common import MAX_ID, atomic, empty_body, fail, iso, json_fields, now, ok, text
+from .common import MAX_ID, atomic, empty_body, fail, iso, json_fields, now, ok, text, transaction
 from .models import User, db
 
 bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 TOKEN_AGE = 604800
+LOGIN_FAILURES = 5
+LOGIN_LOCK_SECONDS = 300
 
 
 class ClockSigner(TimestampSigner):
@@ -78,46 +81,72 @@ def hash_password(password: str) -> str:
     return generate_password_hash(password, method=current_app.config["PASSWORD_METHOD"])
 
 
-def credentials(username: str, password: str) -> User | None:
-    user = db.session.scalar(select(User).where(User.username == username))
-    # The same PBKDF2 check is performed for nonexistent names; error messages are identical.
-    stored = user.password_hash if user else current_app.extensions["dummy_password_hash"]
-    valid = check_password_hash(stored, password)
-    return user if valid else None
-
-
 @bp.post("/register")
-@atomic(write=True)
 def register() -> Any:
     data = json_fields({"username", "password"}, {"username", "password"})
     username = validate_username(data["username"])
     password = validate_password(data["password"])
-    if db.session.scalar(select(User.id).where(User.username == username)) is not None:
-        fail(1006)
-    user = User(username=username, password_hash=hash_password(password), created_at=now())
-    db.session.add(user)
-    try:
-        db.session.flush()
-    except IntegrityError as error:
-        # The unique constraint remains authoritative even after the friendly precheck.
-        if str(error.orig) == "UNIQUE constraint failed: users.username":
+    # The expensive PBKDF2 call must not hold the process-wide write gate.
+    password_hash = hash_password(password)
+    with transaction(write=True):
+        if db.session.scalar(select(User.id).where(User.username == username)) is not None:
             fail(1006)
-        raise
-    return ok(issue_token(user), 201)
+        user = User(username=username, password_hash=password_hash, created_at=now())
+        db.session.add(user)
+        try:
+            db.session.flush()
+        except IntegrityError as error:
+            # The unique constraint remains authoritative even after the friendly precheck.
+            if str(error.orig) == "UNIQUE constraint failed: users.username":
+                fail(1006)
+            raise
+        return ok(issue_token(user), 201)
+
+
+def record_login_failure(user_id: int) -> None:
+    with transaction(write=True):
+        user = db.session.get(User, user_id)
+        if user is None:
+            return
+        instant = now()
+        if user.login_locked_until is not None:
+            if instant < user.login_locked_until:
+                return
+            user.login_failures, user.login_locked_until = 0, None
+        user.login_failures += 1
+        if user.login_failures >= LOGIN_FAILURES:
+            user.login_locked_until = instant + timedelta(seconds=LOGIN_LOCK_SECONDS)
 
 
 @bp.post("/login")
-@atomic(write=True)
 def login() -> Any:
     data = json_fields({"username", "password"}, {"username", "password"})
-    user = credentials(text(data["username"]), text(data["password"]))
-    if user is None:
+    username, password = text(data["username"]), text(data["password"])
+    with transaction():
+        user = db.session.scalar(select(User).where(User.username == username))
+        # Only plain values survive the read transaction; the PBKDF2 call stays outside the gate.
+        account = None if user is None else (user.id, user.password_hash, user.status, user.role,
+                                             user.login_failures, user.login_locked_until)
+        stored = account[1] if account else current_app.extensions["dummy_password_hash"]
+    if account is not None and account[5] is not None and now() < account[5]:
+        remaining = ceil((account[5] - now()).total_seconds())
+        fail(1005, f"账号已锁定，请在{remaining}秒后重试")
+    if not check_password_hash(stored, password):
+        if account is not None:
+            record_login_failure(account[0])
         fail(1007)
-    if user.status != "active":
-        fail(1008)
-    if user.role != "user":
-        fail(1003)
-    return ok(issue_token(user))
+    if account is None:
+        fail(1007)
+    with transaction(write=True):
+        user = db.session.get(User, account[0])
+        if user is None:
+            fail(1007)
+        if user.status != "active":
+            fail(1008)
+        if user.role != "user":
+            fail(1003)
+        user.login_failures, user.login_locked_until = 0, None
+        return ok(issue_token(user))
 
 
 @bp.get("/me")
@@ -172,14 +201,21 @@ def check_csrf() -> None:
 
 def require_admin() -> User:
     sid = session.get("sid")
-    entry = current_app.extensions["admin_sessions"].get(sid) if isinstance(sid, str) else None
-    if entry is None or now() >= entry["expires_at"]:
+    registry = current_app.extensions["admin_sessions"]
+    entry = registry.get(sid) if isinstance(sid, str) else None
+    instant = now()
+    if (entry is None or instant >= entry["expires_at"]
+            or instant >= entry.get("absolute_expires_at", entry["expires_at"])):
+        if entry is not None:
+            registry.pop(sid, None)
         fail(2001)
     user = db.session.get(User, entry["uid"])
     if user is None or user.status != "active":
         fail(2001)
     if user.role != "admin":
         fail(2002)
+    # Idle time restarts on every authenticated request, but the issued session still has an absolute cap.
+    entry["expires_at"] = instant + timedelta(seconds=current_app.config["ADMIN_SESSION_IDLE"])
     return user
 
 
@@ -192,7 +228,13 @@ def create_admin_session(user_id: int) -> None:
         if now() >= entry["expires_at"]:
             registry.pop(sid, None)
     session.clear()
+    instant = now()
     sid = secrets.token_urlsafe(32)
-    registry[sid] = {"uid": user_id, "issued_at": now(), "expires_at": now() + timedelta(minutes=30)}
+    registry[sid] = {
+        "uid": user_id,
+        "issued_at": instant,
+        "expires_at": instant + timedelta(seconds=current_app.config["ADMIN_SESSION_IDLE"]),
+        "absolute_expires_at": instant + timedelta(seconds=current_app.config["ADMIN_SESSION_ABSOLUTE"]),
+    }
     session["sid"] = sid
     session["csrf_token"] = secrets.token_urlsafe(32)

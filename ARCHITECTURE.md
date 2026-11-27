@@ -1,10 +1,10 @@
 # ARCHITECTURE — 校园影集
 
-版本0.1；2026-11-20；状态：架构已通过独立G3，PLAN 0.1已通过独立G4，进入S5按本契约实现。项目依赖已安装锁定，业务及测试进行中，Gm/G5未通过。架构图是设计图，不是已部署系统的证据。
+版本0.2；2026-11-26；状态：0.1已通过独立G3，0.2按D-026～D-029同步暂存上传、缩略封面、登录锁定与管理会话，尚未重新独立审查；PLAN 0.1已通过独立G4，进入S5按本契约实现。项目依赖已安装锁定，业务及测试进行中，Gm/G5未通过。架构图是设计图，不是已部署系统的证据。
 
 ## 1. 上下文与输入
 
-- 需求输入：SPEC 0.3，31R/157AC，已通过独立G1；全部Must/Should均实现，不按旧六人分工或旧四周日期分配工作。
+- 需求输入：SPEC 0.4，31R/163AC（0.3的157AC已通过独立G1；0.4新增AC-158～AC-163待独立复核），全部Must/Should均实现，不按旧六人分工或旧四周日期分配工作。
 - 形态输入：DECISIONS D-001～D-019及九页面原型0.2，已通过独立G2；首页V1单列动态，三Tab，后台成功登录统一到用户管理。
 - 已选栈：原生微信小程序；Python 3.12、Flask/Jinja2、Flask-SQLAlchemy/SQLAlchemy、SQLite、本地媒体。表现层→Blueprint→Service→ORM，不新增外部服务。
 - 规模：一个后端进程、最多20个演示客户端；正式性能样本200作品、1000评论、1000评分。首页/检索20客户端并发、上传单请求，各冷客户端缓存5次；时限仍为2秒/5秒，不用设计推断实测通过。
@@ -21,7 +21,7 @@
 | common | 配置、JSON响应、输入基础解析、日期/码点工具、进程内写入锁、事务入口 | 不编排注册/发布/评分业务、不吞未知异常冒充成功 |
 | auth Blueprint + AuthService | 注册/登录、Token签验、版本撤销、改密、管理员Session/锁定 | 不修改作品正文，不信任请求role/user_id |
 | work Blueprint + WorkService | 公开/本人/管理查询，发布编辑删除，标签关联，事务编排 | 不决定媒体物理路径，不直接返回文件字节 |
-| media Blueprint + MediaService | 上传校验、UUID文件键、暂存/落盘/回滚、媒体状态校验及Range读取 | 不根据客户端路径读文件，不绕过作品/作者状态 |
+| media Blueprint + MediaService | 逐文件暂存上传与引用校验、上传校验、UUID文件键、暂存/落盘/回滚、缩略封面校验与同源封面读取、媒体状态校验及Range读取 | 不根据客户端路径读文件，不绕过作品/作者状态，不做图像解码或转码 |
 | interaction Blueprint + InteractionService | 评论、单用户评分更新、统计 | 不改变作品/作者，不物理删除历史互动 |
 | admin Blueprint + AdminService | 管理查询、禁用/移除、渲染上下文、后台登出 | 不复制公开API的过滤条件，不增加恢复或批量操作 |
 | models + SQLite | 七实体、索引、唯一/外键/检查约束 | 不渲染、不替代Service权限与输入校验 |
@@ -34,7 +34,7 @@
 
 1. 小程序读公开作品不带也不需要Token；受限请求带Authorization: Bearer。服务器在当前事务内解析身份、读取User并校验active/token_version/role。
 2. 后台浏览器先GET登录页取得CSRF令牌，POST凭据；Session成功后重定向/admin/users。其他后台页面无Session重定向登录；写操作无Session返回401/2001，不把重定向当成功。
-3. 发布/编辑：解析multipart→锁与事务→身份/归属/状态→有效字段/媒体校验→暂存新文件→写实体与关联→移至最终UUID路径→一次提交→201/200。
+3. 发布/编辑：解析multipart→锁与事务→身份/归属/状态→有效字段/媒体校验→暂存新文件→写实体与关联→移至最终UUID路径→一次提交→201/200。使用`media_keys`时文件已在暂存上传阶段落到`u{上传者id}-{uuid}`最终键，本步只校验归属/存在/占用并写关联，不做tmp移动。
 4. 禁用：锁与事务内再次查Session/管理员→查目标→拒绝自己→检查状态→用户disabled、全部作品removed→一次提交。公开查询/媒体路由按新状态拒绝访问。
 5. 客户端仅在收到成功响应后切换成功状态；超时视为结果未知，先查状态，不自动重放写请求。详情发现1010必须清内容及互动区。
 
@@ -44,8 +44,8 @@
 
 | 实体 | 字段与约束 |
 |---|---|
-| User | id PK；username VARCHAR(20) NOT NULL UNIQUE BINARY；password_hash TEXT NOT NULL；role CHECK(user/admin)；status CHECK(active/disabled)；token_version INTEGER>=0；created_at NOT NULL；admin_failures INTEGER>=0默认0；admin_locked_until UTC可空 |
-| Work | id PK；user_id FK User.id NOT NULL；title VARCHAR(50)默认空；content TEXT默认空；activity_date DATE NOT NULL；status CHECK(visible/removed)默认visible；created_at、updated_at NOT NULL |
+| User | id PK；username VARCHAR(20) NOT NULL UNIQUE BINARY；password_hash TEXT NOT NULL；role CHECK(user/admin)；status CHECK(active/disabled)；token_version INTEGER>=0；created_at NOT NULL；admin_failures INTEGER>=0默认0；admin_locked_until UTC可空；login_failures INTEGER>=0默认0；login_locked_until UTC可空 |
+| Work | id PK；user_id FK User.id NOT NULL；seed_key TEXT可空UNIQUE（仅演示种子幂等用）；title VARCHAR(50)默认空；content TEXT默认空；activity_date DATE NOT NULL；status CHECK(visible/removed)默认visible；cover_key TEXT可空、cover_mime可空、cover_size INTEGER可空；created_at、updated_at NOT NULL |
 | Media | id PK；work_id FK Work.id NOT NULL；kind CHECK(image/video)；file_key TEXT UNIQUE NOT NULL；mime TEXT；size_bytes INTEGER>0；position INTEGER>=0；active BOOLEAN默认真；created_at NOT NULL |
 | Tag | id PK；name VARCHAR(10) UNIQUE BINARY NOT NULL |
 | WorkTag | work_id FK Work.id、tag_id FK Tag.id，二者构成联合PK，不另存关联数量 |
@@ -53,7 +53,10 @@
 | Rating | id PK；work_id FK Work.id；user_id FK User.id；score INTEGER CHECK 1<=score<=5；created_at、updated_at；UNIQUE(work_id,user_id) |
 
 - 外键每个连接启用PRAGMA foreign_keys=ON；不配置用户/作品的物理级联删除入口。软移除、禁用均保留Work/Media/Comment/Rating及磁盘文件。
+- 已有实例升级不重建表：`create_all`之后按`PRAGMA table_info`逐列检查，只对缺失列执行`ALTER TABLE ... ADD COLUMN`（本次为users.login_failures/login_locked_until与works.cover_*），不改写或删除任何行；不是自动化迁移框架，也不回填历史数据。
 - 当前有效媒体用active=true及position排序。替换将旧Media.active=false、增加新行；旧文件保留但旧ID不可访问。新媒体position从0递增；同一有效集合的位置唯一由串行写事务保证。
+- 缩略封面不是Media行：Work的cover_key指向同目录文件，不占1—9张图片名额，不进入详情媒体数组；作品removed或作者disabled时封面路由同样不可读。替换媒体且未提交新封面时清空封面字段。封面结构在暂存上传时已校验，引用时只复核键归属、存在与≤512KiB，不再解码；同一暂存键可以同时是一个Media和一个封面（文件复用，清理时两处引用都计入引用集），客户端不这样使用。
+- 逐文件暂存键为`u{上传者id}-{32位十六进制}.{ext}`，只有该用户本人可引用；引用时复核存在、类型、大小与是否已被Media占用。服务启动清理无引用且超过1小时（STAGE_TTL=3600秒）的暂存文件；旧式无前缀孤儿文件仍立即清理。
 - 索引：Work(status,created_at,id)、Work(user_id,created_at,id)、Work(activity_date,status)、WorkTag(tag_id,work_id)、Comment(work_id,created_at,id)、Media(work_id,active,position)。Rating唯一索引同时用于人数/均分查询。
 - 稳定顺序：作品created_at DESC,id DESC；评论created_at DESC,id DESC；后台用户id DESC。编辑不改created_at，标签查询不改变公开排序。
 - 公开可见谓词固定为Work.status=visible AND User.status=active。公开详情/媒体/互动每次都重查；本人列表保留本人removed元信息，管理列表不过滤removed。
@@ -74,9 +77,10 @@
 | RatingStats | rating_avg,rating_count,my_score；my_score仅评分写响应或当前用户评分查询中返回，公开详情不依赖认证 |
 | Page<T> | list:T[],total,page,page_size；超过末页list=[]，不回退最后一页 |
 | AdminUserRow | id,username,role,status,created_at,work_count；计数含removed，在列头标明 |
-| AdminWorkRow | id,user:{id,username},title,summary,activity_date,tags,status |
+| AdminWorkRow | id,user:{id,username},title,summary,activity_date,tags,status,cover_url,media_count,media_url；media_url为首个有效媒体的`/media/{id}`，removed为null，用于后台打开原媒体 |
+| UploadStaged | key,kind,mime,size_bytes；仅暂存上传响应，不含磁盘路径或原文件名 |
 
-summary取content前80码点，无正文时为空，由标题/媒体标识呈现卡片；不把省略号算入原始正文。cover_url仅image时为position=0的有效媒体；video用标识，不生成视频截图。MyWorkCard的removed摘要不用于恢复P03内容。
+summary取content前80码点，无正文时为空，由标题/媒体标识呈现卡片；不把省略号算入原始正文。cover_url仅image时为position=0的有效媒体；video用标识，不生成视频截图。MyWorkCard的removed摘要不用于恢复P03内容。保存了缩略封面时cover_url指向`/media/cover/{work_id}`，否则回退到第一张图片的`/media/{id}`；removed一律为null。
 
 ## 4. 接口契约
 
@@ -89,6 +93,7 @@ summary取content前80码点，无正文时为空，由标题/媒体标识呈现
 - 所有写字段后端再验证，前端只提前反馈。正文/标签/评论trim，用户名不自动改写，标题保留输入。密码不trim、不回显；字母/数字规则依SPEC执行。
 - 文件multipart字段images可重复、video可重复以便明确拒绝多视频；text字段title/content/activity_date/tags，tags为JSON字符串数组；省略tags时发布[]。不让逗号分隔破坏合法标签名称。
 - 发布缺activity_date才默认北京时间今天；空/null非法。编辑省略title/content/tags/activity_date分别保留旧值；显式title/content空串允许，tags=[]清标签，日期空/null非法。省略媒体或未传文件保留原媒体，有文件整体替换，无清空全部媒体标志。
+- 发布/编辑可改用`media_keys`（JSON字符串数组）引用先前`POST /api/uploads`得到的键；与multipart文件字段互斥，同时出现返回400/1001，空数组不是清空媒体。省略`media_keys`且未传文件时保留原媒体。可选`cover_key`引用暂存图片作为缩略封面，仅当最终有效媒体含图片时允许；替换媒体且未提交`cover_key`时清除封面。
 - 请求体上限100MiB（9×10MiB加表单开销）；超过总上限归400/1015。字段上限仍分别验证，不能以总大小替代每文件大小。不得截断正文/文件使非法输入变合法。
 
 ### 4.2 小程序与公开API
@@ -96,7 +101,7 @@ summary取content前80码点，无正文时为空，由标题/媒体标识呈现
 | 方法与路径 | 输入 | 成功data / HTTP | Service校验及主要失败 |
 |---|---|---|---|
 | POST /api/auth/register | JSON username,password | AuthResult / 201 | Auth：字段/用户名/密码→唯一性；1001/1006；两次确认在客户端 |
-| POST /api/auth/login | JSON username,password | AuthResult / 200 | Auth：字段→统一凭据错误1007→disabled 1008→拒绝admin 1003 |
+| POST /api/auth/login | JSON username,password | AuthResult / 200 | Auth：字段→存在账号的锁定1005（含剩余秒数）→统一凭据1007并累计失败→disabled 1008→拒绝admin 1003；成功清零 |
 | GET /api/auth/me | Bearer | UserPublic / 200 | Auth：签名/期限→DB版本/active→普通用户；1002/1003 |
 | POST /api/auth/password | Bearer；JSON old_password,new_password | null / 200 | Auth：身份→字段→原密1007→新密规则/与旧相同1001；成功递增版本 |
 | POST /api/auth/logout | Bearer；无业务字段 | null / 200 | Auth：有效普通用户才递增版本；无效/重复Token返回401/1002，客户端清本地，不能500 |
@@ -104,14 +109,16 @@ summary取content前80码点，无正文时为空，由标题/媒体标识呈现
 | GET /api/tags | 无 | [{id,name}] / 200 | Work：按名称顺序返回已存标签，不写死列表 |
 | GET /api/works/{id} | 正整数路径ID | WorkDetail / 200 | Work：不存在1004；removed/作者disabled 1010 |
 | GET /api/works/mine | Bearer；page/page_size | Page<MyWorkCard> / 200 | Work：身份→分页→仅当前用户（含removed）；1002/1003/1001 |
-| POST /api/works | Bearer；multipart | WorkDetail（含id）/ 201 | Work/Media：按§4.4；1001/1002/1003/1011—1016 |
-| PUT /api/works/{id} | Bearer；multipart部分字段 | WorkDetail / 200 | Work/Media：身份→存在1004→归属1003→removed 1005→编辑后整体字段校验 |
+| POST /api/works | Bearer；multipart | WorkDetail（含id）/ 201 | Work/Media：按§4.4；1001/1002/1003/1005（引用已被占用）/1011—1016 |
+| POST /api/uploads | Bearer；multipart单字段file | UploadStaged / 201 | Media：身份→仅一个file字段→后缀/MIME/大小/结构；1001/1002/1015/1016 |
+| PUT /api/works/{id} | Bearer；multipart部分字段 | WorkDetail / 200 | Work/Media：身份→存在1004→归属1003→removed 1005→引用占用1005→编辑后整体字段校验 |
 | DELETE /api/works/{id} | Bearer；无业务字段 | {id,status:"removed"} / 200 | Work：身份→存在1004→归属1003→状态1005→软移除 |
 | GET /api/works/{id}/comments | page/page_size，默认20 | Page<CommentPublic> / 200 | Interaction：存在/可见1004/1010→分页1001 |
 | POST /api/works/{id}/comments | Bearer；JSON content | CommentPublic / 201 | Interaction：身份→作品可见→trim后1—500；1002/1003/1004/1010/1001 |
 | GET /api/works/{id}/rating | Bearer | RatingStats / 200 | Interaction：身份→作品可见；尚未评分my_score=null；本人作品也可读统计 |
 | PUT /api/works/{id}/rating | Bearer；JSON score | RatingStats / 200 | Interaction：身份→可见→1—5整数（拒绝bool）→禁自评1009→插入/更新唯一评分 |
 | GET /media/{id} | ID；可带标准Range头 | 原媒体字节 / 200或206 | Media：记录存在→active→作品visible/作者active→受控键/存在文件；不可用404/1010，未知ID404/1004 |
+| GET /media/cover/{work_id} | 作品ID | 缩略封面字节 / 200 | Media：封面存在→作品visible/作者active；不可用404/1010，无封面或未知作品404/1004 |
 
 媒体成功不套JSON；不满足的字节Range按HTTP标准416，不用业务400代替。HEAD与GET使用同一状态检查。未知API路径404/1004，不把字符串路径当磁盘路径；方法不匹配由HTTP405表达，不执行写动作。
 
@@ -133,7 +140,8 @@ summary取content前80码点，无正文时为空，由标题/媒体标识呈现
 
 - 公共读：解析路由→查询字段类型/范围→查询。详情/媒体按目标存在和可见状态判定；媒体不得先开文件后鉴权。
 - 注册：字段类型→用户名格式/长度→密码格式/长度→用户名唯一。
-- 登录：字段类型→凭据（不存在与错密同1007）→账号状态→角色；管理登录在凭据前检查该账号锁定。管理员账号第5次凭据失败设置locked_until=now+300s；成功清零，达到期限清锁后开始下一轮。
+- 登录：字段类型→存在账号的锁定（409/1005）→凭据（不存在与错密同1007）→账号状态→角色。普通用户第5次凭据失败设置login_locked_until=now+300s，成功清零，达到期限清锁后开始下一轮；未知用户名不写锁定状态。管理登录在凭据前检查admin_locked_until，口径相同。
+- 标签：移除零宽/控制字符→折叠内部空白→去首尾空格→去重→长度与数量校验；发布、编辑与查询共用同一函数，1001/1013按入口区分。
 - 发布/编辑内容验证：身份/编辑权限与状态→字段类型→标题→正文上限→活动日期→标签→A正文或媒体存在→B不混合→C图片合法→D视频合法→写入。对应1011/1014/1015按短路顺序；不会为了条件覆盖改变顺序。
 - 编辑的A/B/C/D使用最终有效内容与保留/替换后的媒体；保留媒体使用已经存储的元数据，不能把“本次无文件”判为纯文字。
 - 评论：身份→作品存在/可见→评论；评分：身份→作品存在/可见→分数范围→自评。移除：Session→role→CSRF→存在→状态→修改；CSRF属请求来源安全校验，不修改资源的业务顺序。
@@ -146,7 +154,7 @@ summary取content前80码点，无正文时为空，由标题/媒体标识呈现
 - 密码采用Werkzeug PBKDF2-HMAC-SHA256，600000轮、每次独立随机盐；校验调用哈希验证函数，不自行比较明文。测试可配置较低轮数，但实际Gm/验收须另验证默认参数，不能据低轮测试推断生产耗时。
 - 小程序Token用itsdangerous时间戳签名，独立salt；负载仅uid、token_version；max_age=604800秒，并在满期限时拒绝（边界不接受第604800秒）。每个受限请求在当前事务中查User，只有active、普通角色且版本相等可用。
 - 退出/改密在同一写事务中递增token_version。客户端401清Token和用户信息；重启调用/api/auth/me确认后才恢复受限页，不能仅凭本地有字符串视为登录。
-- 管理端使用Flask签名Cookie加单进程内随机sid注册表；注册表保存uid、签发时间、绝对到期时间，30分钟到期，不滑动续期。Cookie为HttpOnly、SameSite=Lax；本机HTTP不设Secure，HTTPS环境设Secure。不在Cookie中放密码或小程序Token。
+- 管理端使用Flask签名Cookie加单进程内随机sid注册表；注册表保存uid、签发时间、空闲到期时间与绝对到期时间。每次已认证请求把空闲期限续到30分钟后，签发后满8小时必须失效。Cookie为HttpOnly、SameSite=Lax；本机HTTP不设Secure，HTTPS环境设Secure。不在Cookie中放密码或小程序Token。
 - 登录成功轮换sid和CSRF值，登出删除当前sid并清Cookie；服务重启丢弃注册表，原Cookie不能恢复管理会话。两个管理会话各自登出不撤销另一个，且不能复用小程序Token。
 - CSRF使用secrets随机值与constant-time比对，包含登录、退出、禁用、移除表单；服务端不接受仅靠隐藏按钮或浏览器确认实现保护。
 - 启动密钥来自环境或instance内随机生成的本地密钥文件，不写入源代码/日志。测试使用隔离密钥，实例文件不提交或随交付源码打包。
@@ -156,11 +164,11 @@ summary取content前80码点，无正文时为空，由标题/媒体标识呈现
 
 1. 每次写命令获取同一进程RLock（最多等5秒，超时409/1005），再进入一个SQLAlchemy事务；身份、归属和状态在锁内重查，不沿用锁外对象快照。ORM隐式查询也必须位于该事务，避免先查询后begin的嵌套冲突。
 2. SQLite启用WAL、busy_timeout=5000ms。所有应用写入口（注册、登录锁计数、撤销、作品、互动、管理、初始化）使用同一写门；读请求只进行短事务，结束即释放连接，不在数据库事务中播放视频。
-3. 文件流读入服务端临时目录，每个文件边读取边累计大小，超过单文件上限立即失败；后缀与请求MIME、实际文件头/容器标识一致才接受。PNG/JPEG须有相应结构与结束标记，MP4须有有效ftyp及可界定的容器结构；不以扩展名或Content-Type单独判断，不引入转码/图片解码依赖。
+3. 文件流读入服务端临时目录，每个文件边读取边累计大小，超过单文件上限立即失败；后缀与请求MIME、实际文件头/容器标识一致才接受。逐文件暂存上传直接写入最终键路径并完成同样的结构校验后才返回键。PNG/JPEG须有相应结构与结束标记，MP4须有有效ftyp及可界定的容器结构；不以扩展名或Content-Type单独判断，不引入转码/图片解码依赖。
 4. 临时与最终目录均在instance/media下，生成UUID十六进制文件键加规范后缀；绝不拼接原文件名或客户端目录。服务端使用数据库键和规范化路径确认仍位于媒体根下，再读写。
-5. 所有输入校验通过后才创建Work/Tag/WorkTag/Media并flush。新文件从tmp原子移动到最终目录；所有移动成功后提交一次数据库事务。编辑把旧Media标inactive与新关联放同一事务，旧文件不删除。
+5. 所有输入校验通过后才创建Work/Tag/WorkTag/Media并flush。直接上传的新文件从tmp原子移动到最终目录，所有移动成功后提交一次数据库事务；`media_keys`路径直接把既有暂存键挂为Media，不移动文件。编辑把旧Media标inactive与新关联放同一事务，旧文件不删除。
 6. 在提交前失败：回滚所有实体及关联，删除本请求新建的暂存文件和已移动的新文件；不能删除之前已提交或旧版本文件。若清理本请求文件失败，记不含用户内容的维护错误，文件无已提交关联而不可访问。
-7. 进程在文件移动后、DB提交前崩溃会残留孤立文件；重新启动先按已提交Media.file_key建立引用集，清理tmp及未引用的新文件。所有历史Media行（包括inactive和removed作品）均保留在引用集，绝不以不可见为理由删除其文件。启动清理发生在开始接收请求之前。
+7. 进程在文件移动后、DB提交前崩溃会残留孤立文件；重新启动先按已提交Media.file_key与Work.cover_key建立引用集，清理tmp、无引用的旧式孤儿文件，以及超过1小时仍无引用的暂存键文件。所有历史Media行（包括inactive和removed作品）均保留在引用集，绝不以不可见为理由删除其文件。启动清理发生在开始接收请求之前。
 8. 数据库提交后响应丢失，作品仍已成功保存，客户端不可自动再次发布。客户端可从“我的作品”核对后决定；本期没有幂等键或重复正文去重语义。
 
 媒体读取先查Media.active、作品及作者，再构造send_file响应；Cache-Control:no-store，响应重新读取不可见状态后不返回字节，避免未来请求继续用服务器缓存。Range/HEAD同样鉴权；已开始传输的响应不承诺追溯撤回，设备离线缓存不承诺擦除。
@@ -177,7 +185,7 @@ summary取content前80码点，无正文时为空，由标题/媒体标识呈现
 ## 6. 小程序与后台实现契约
 
 - TypeScript源文件与WXML/WXSS/JSON放原生工程，tsc生成微信可执行CommonJS JavaScript，不生成网页替代品。S4确定编译入口；ESLint覆盖所有生成的业务JS及手写JS，TypeScript检查源文件，核心测试读取同一编译产物。不以仅扫描一个空目录通过Gm。
-- 微信wx.uploadFile一次只能上传一个文件；多媒体发布采用wx.request的multipart ArrayBuffer，使用文件系统读取已选文件，按HTTP multipart边界拼接一次请求。≤9张/90MiB加封装会增加客户端峰值内存，这是需实测的后果；不私自把9张改成逐张独立作品或提前提交半成品。
+- 微信wx.uploadFile一次只能上传一个文件；交付客户端对每个文件各发一次`POST /api/uploads`（multipart ArrayBuffer，文件系统读取后流式填充），提交阶段只发送字段与`media_keys`，不再组包90MiB单请求。单请求multipart发布/编辑仍保留为兼容与回归路径，不在客户端主链路使用。≤9张/90MiB的单请求峰值内存只在兼容路径出现；不私自把9张改成逐张独立作品或提前提交半成品。
 - 媒体请求超时60秒，普通读/写15秒；超时阈值不替代2秒/5秒性能判据。系统文件选择和播放用原生API，上传进度至少有“读取/上传中/完成/失败”状态，不伪造百分比。
 - 首页筛选使用请求代次；切换条件后旧响应即使晚到也丢弃。每代同页只有一个在途请求，页码在成功后推进，按ID去重；返回首页保留条件但从第1页重新请求当前状态。
 - P04仅内存保留未提交表单；退出确认不生成持久草稿。密码/Token不进入普通本地草稿；认证存储专用键，退出清理；来源只允许P01—P06内的已知页面与合法作品ID。
@@ -195,7 +203,7 @@ summary取content前80码点，无正文时为空，由标题/媒体标识呈现
 | 错 | 磁盘写入/移动失败 | 500/1016；旧编辑版本仍可见，发布无半成品；保留表单与可重试提示 |
 | 错 | 媒体行存在但文件缺失 | 404/1004，不泄露磁盘路径；页面显示媒体失败/重试，不把缺文件变空白成功 |
 | 超时 | 读/写网络超过15秒，媒体上传超过60秒 | 请求结束loading，保留输入；写结果未知不自动重试，先重新查询；已提交数据不因断线撤销 |
-| 超时 | 管理锁5分钟/Session30分钟/Token7天 | 锁定409/1005；无效Session写401/2001、页面重定向；小程序401/1002并清本地，分别按两端导航规则重登 |
+| 超时 | 管理锁5分钟/Session30分钟空闲+签发后8小时绝对上限/Token7天 | 锁定409/1005；无效Session写401/2001、页面重定向；小程序401/1002并清本地，分别按两端导航规则重登 |
 | 并发 | 同名注册、重复评分、并发编辑、删除与编辑、禁用与发布 | 全部写门串行、DB约束兜底，行为按§5.3；锁等5秒失败409/1005，不悄悄重试 |
 | 并发 | 筛选改变、旧响应后到、触底重复事件 | 请求代次+在途页去重，旧响应不覆盖新筛选；失败页不推进页码 |
 | 权限 | 游客、伪user_id、他人作品、admin小程序写、disabled旧Token | 身份与归属来自服务端当前事务，按1002/1003拒绝；伪造字段不能提权 |
@@ -212,8 +220,8 @@ summary取content前80码点，无正文时为空，由标题/媒体标识呈现
 | ADR-01 交付与渲染 | 原生微信+Jinja2单体 / H5替代或SPA | 原生为既有交付约束；Jinja2复用Python栈和已有表单，新增SPA会增加构建/认证边界 | 两套UI需分别验收；浏览器不能证明微信。只有新范围批准才讨论客户端替换 |
 | ADR-02 存储与并发 | SQLite单进程写门 / PostgreSQL或多进程 | ≤20客户端与课程体量，不需新数据库服务；写门让禁用、发布与文件补偿具有单一顺序 | 写入排队、无横向扩展；超过现有并发或启多进程须重新G3，不能直接开多worker |
 | ADR-03 媒体 | 本地受控目录+DB关联 / 静态直链或对象存储 | 复用既有本地存储；每次访问能检查removed/disabled，静态直链无法撤销 | 需要Range与文件补偿；历史文件占空间。公网/多机媒体需求须新授权，不改静态绕过 |
-| ADR-04 认证 | 7天签名Token+DB版本、独立30分钟Session / 仅本地退出或共用Token | 旧版本整体撤销及后台独立登录均来自SPEC；使用Flask已带依赖，无新认证库 | 每次受限请求查DB，服务重启后台重登；多进程需共享Session存储，当前不引入 |
-| ADR-05 上传原子性 | 单次multipart+文件补偿 / 分文件暂存上传API | 现有发布调用链就是multipart；一次业务写事务，不新增公开上传票据协议 | 微信端需要组装ArrayBuffer，有内存峰值和耗时风险；S6必须真机实测，失败不能降低原规格 |
+| ADR-04 认证 | 7天签名Token+DB版本、后台独立Session（30分钟空闲滑动+8小时绝对上限）/ 仅本地退出或共用Token | 旧版本整体撤销及后台独立登录均来自SPEC；使用Flask已带依赖，无新认证库 | 每次受限请求查DB，服务重启后台重登；多进程需共享Session存储，当前不引入 |
+| ADR-05 上传原子性 | 逐文件暂存 + 引用提交（保留单请求multipart兼容）/ 为暂存新增数据表、按客户端路径定位 | 单文件请求峰值内存约为一个媒体大小，失败可只重传该文件；归属由键名`u{上传者id}-`与写门校验，一次业务写事务提交引用 | 每文件一次请求，发布前需先完成N次上传；未引用的暂存文件靠1小时TTL清理；单请求兼容路径仍需真机实测，失败不能降低原规格 |
 | ADR-06 统计与查询 | SQL关联/聚合实时计算 / 冗余计数或缓存 | 200作品/1000评分规模可直接查；避免评分更新或禁用后缓存失效分歧 | 需批量关联避免N+1；增长后以实测决定索引/聚合调整，不能凭猜测加缓存服务 |
 | ADR-07 文件版本 | 旧Media inactive并保留文件 / 删除旧文件或仍公开旧URL | 整体替换后旧内容不应通过旧入口继续访问，保留行能区分历史与崩溃孤立文件 | 占磁盘但可追溯；没有媒体清理产品能力，不把启动孤立清理用于历史文件 |
 
@@ -226,7 +234,7 @@ summary取content前80码点，无正文时为空，由标题/媒体标识呈现
 - 默认种子只用虚构内容；性能样本另建隔离数据库和媒体目录，不覆盖默认演示库。测试配置、fixture目录和密钥隔离，不向真实账号发请求。
 - 密码由初始化配置输入，程序不打印密码/哈希；演示说明只描述设置入口，不将机密混入日志或证据。清库、重置用户或覆盖实例不自动执行。
 - 不承诺高可用或自动跨机容灾。SQLite文件在服务停止后连同已提交media与密钥作本地备份；备份/还原须用户明确要求，不能自动覆盖实例。磁盘/进程故障返回失败或连接中断，启动孤立清理见§5.2。
-- 性能上传可能需要90MiB缓冲及复制；目前无内存与时限实测。记录这项风险而非伪造结果；若真机达不到已冻结标准，回到设计/用户裁决，不把API时间替代首屏或以模拟wx通过。
+- 性能上传在兼容路径可能需要90MiB缓冲及复制，逐文件路径峰值约一个媒体大小；目前无内存与时限实测。记录这项风险而非伪造结果；逐文件上传期间仍持有进程写门，其他写请求在锁等5秒后可能得到409/1005，须纳入P-27并发观测。若真机达不到已冻结标准，回到设计/用户裁决，不把API时间替代首屏或以模拟wx通过。
 
 ## 10. 图解与下游动作
 
@@ -247,8 +255,8 @@ summary取content前80码点，无正文时为空，由标题/媒体标识呈现
 
 - [x] 独立G3核对两输入、取舍后果、职责排除、接口校验归属、空/错/超时/并发/权限；架构0.1六项均通过，无阻断修正。
 - 实施提醒（不新增需求）：Python3.12的SQLite默认legacy事务不能仅靠Session.begin保证SELECT快照，S5用显式BEGIN配置落实本文短事务；极大整数ID/页码避免SQLite绑定及OFFSET溢出，超末页仍空；Token到期边界须显式验证满604800秒拒绝；微信ArrayBuffer90MiB及5秒仍需实测。
-- [x] S4已按31R/157AC形成30任务并通过G4；安排了微信/浏览器环境、缺陷分级、性能样本与16组合/真实路径，实际执行仍由PLAN逐项记录。
+- [x] S4已按31R/157AC形成30任务并通过G4（SPEC 0.4增至163AC后任务数不变，新AC已补入P-05/P-07/P-08/P-19的对应列，待独立复核）；安排了微信/浏览器环境、缺陷分级、性能样本与16组合/真实路径，实际执行仍由PLAN逐项记录。
 - [ ] S5冻结依赖版本、初始化命令及双端lint/typecheck/test；实现时不临时换栈或新增业务码。
 - [ ] S6真实后台浏览器、微信工具/真机、性能、兼容与T/E；未执行不得改为通过。
 
-Q-S02的ROUND_HALF_UP/null、Q-S03的锁定409/1005及30分钟Session、Q-S06的inactive旧媒体和文件补偿、Q-S07的路由/字段/标签编码/编辑省略/复合失败顺序已在本稿给出；这些契约已获独立G3确认，不代表业务实测。Q-S09/Q-S10环境与缺陷分级留S4—S6。
+Q-S02的ROUND_HALF_UP/null、Q-S03的锁定409/1005及30分钟空闲滑动+8小时绝对上限、Q-S06的inactive旧媒体和文件补偿、Q-S07的路由/字段/标签编码/编辑省略/复合失败顺序已在本稿给出；这些契约已获独立G3确认，不代表业务实测。Q-S09/Q-S10环境与缺陷分级留S4—S6。

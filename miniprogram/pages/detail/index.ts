@@ -11,15 +11,23 @@ Page({
   data: { work: null as WorkDetail | null, loading: true, error: '', unavailable: '', comments: [] as (CommentPublic & { time: string })[], commentsLoading: false, commentsDone: false, commentsError: '', commentError: '', comment: '', commentCount: 0, commentBusy: false, ratingText: '', myScore: null as number | null, score: 0, stars: [1, 2, 3, 4, 5], ratingBusy: false, ratingError: '', loggedIn: false, own: false, mediaError: '', videoHeight: 220 },
   id: 0, generation: 0, ratingGeneration: 0, scoreEdited: false, pager: new Pager<CommentPublic>(20),
   onLoad(options) { this.id = workId(options.id) || 0; },
-  onShow() { void this.reload(); },
+  onShow() { void this.load(!!this.data.work); },
   onUnload() { this.generation++; this.ratingGeneration++; this.pager.reset(); },
   onPullDownRefresh() { void this.reload(); },
   onReachBottom() { void this.loadComments(); },
   stopUnavailable(code: number) { this.generation++; this.ratingGeneration++; this.pager.reset(); this.setData({ ...unavailableState(code), commentCount: 0, own: false, commentBusy: false, ratingBusy: false, error: '' }); },
-  async reload() {
+  reload() { return this.load(false); },
+  async load(quiet: boolean) {
     if (!this.id) { this.stopUnavailable(1004); wx.stopPullDownRefresh(); return; }
-    const generation = ++this.generation; this.ratingGeneration++; this.scoreEdited = false; this.pager.reset();
-    this.setData({ work: null, loading: true, error: '', unavailable: '', comments: [], commentsLoading: false, commentsDone: false, commentsError: '', commentError: '', ratingError: '', ratingText: '', myScore: null, score: 0, ratingBusy: false, commentBusy: false, mediaError: '', loggedIn: false, own: false });
+    const generation = ++this.generation; this.ratingGeneration++; this.pager.reset();
+    // Returning from login or an image preview re-checks the server without unmounting the
+    // article, so the reader keeps their scroll position and unsubmitted comment draft.
+    if (quiet) {
+      this.setData({ error: '', unavailable: '', commentsLoading: false, commentsDone: false, commentsError: '', commentError: '', ratingError: '', mediaError: '' });
+    } else {
+      this.scoreEdited = false;
+      this.setData({ work: null, loading: true, error: '', unavailable: '', comments: [], commentsLoading: false, commentsDone: false, commentsError: '', commentError: '', ratingError: '', ratingText: '', myScore: null, score: 0, ratingBusy: false, commentBusy: false, mediaError: '', loggedIn: false, own: false });
+    }
     try {
       const work = await api<WorkDetail>(`/api/works/${this.id}`);
       if (generation !== this.generation) return;

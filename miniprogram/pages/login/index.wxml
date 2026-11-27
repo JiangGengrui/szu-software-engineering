@@ -1,1 +1,21 @@
-<view class="page auth-page"><view class="brand"><text class="title">校园影集</text><view class="muted">把校园里的日常，留成值得回看的故事</view></view><view class="panel"><view class="row modes"><button class="grow {{!register ? 'primary' : ''}}" data-mode="login" disabled="{{busy}}" bindtap="toggle">登录</button><button class="grow {{register ? 'primary' : ''}}" data-mode="register" disabled="{{busy}}" bindtap="toggle">注册</button></view><view class="field"><text class="label">用户名</text><input value="{{username}}" maxlength="-1" data-field="username" bindinput="input" disabled="{{busy}}" placeholder="3—20字，中英文、数字、下划线"/><text wx:if="{{field === 'username'}}" class="field-error">{{error}}</text></view><view class="field"><text class="label">密码</text><input password value="{{password}}" maxlength="-1" data-field="password" bindinput="input" disabled="{{busy}}" placeholder="8—20位，同时包含字母和数字"/><text wx:if="{{field === 'password'}}" class="field-error">{{error}}</text></view><view wx:if="{{register}}" class="field"><text class="label">确认密码</text><input password value="{{confirmation}}" maxlength="-1" data-field="confirmation" bindinput="input" disabled="{{busy}}" placeholder="请再次输入密码"/><text wx:if="{{field === 'confirmation'}}" class="field-error">{{error}}</text></view><view wx:if="{{error}}" class="error-box">{{error}}</view><button class="primary" loading="{{busy}}" disabled="{{busy}}" bindtap="submit">{{busy ? '正在提交…' : register ? '注册并登录' : '登录'}}</button><view class="hint spaced">{{register ? '注册成功自动登录，并返回原页面。' : '登录后返回原页面，不自动提交先前操作。'}}</view></view><button class="link" disabled="{{busy}}" bindtap="browse">暂不登录，游客浏览首页</button></view>
+<view class="page auth-page">
+  <view class="seal serif">影</view>
+  <view class="brand"><text class="title serif">校园影集</text><view class="slogan">把校园里的日常<br/>留成值得回看的故事</view></view>
+
+  <view class="auth-card">
+    <view class="row modes"><button class="mode grow {{!register ? 'on' : ''}}" data-mode="login" disabled="{{busy}}" bindtap="toggle">登录</button><button class="mode grow {{register ? 'on' : ''}}" data-mode="register" disabled="{{busy}}" bindtap="toggle">注册</button></view>
+
+    <view class="field"><text class="label">用户名</text><input value="{{username}}" maxlength="-1" data-field="username" bindinput="input" disabled="{{busy}}" placeholder="3—20字，中英文、数字、下划线"/><text wx:if="{{field === 'username'}}" class="field-error">{{error}}</text></view>
+
+    <view class="field"><text class="label">密码</text><input password value="{{password}}" maxlength="-1" data-field="password" bindinput="input" disabled="{{busy}}" placeholder="8—20位，同时包含字母和数字"/><text wx:if="{{field === 'password'}}" class="field-error">{{error}}</text></view>
+
+    <view wx:if="{{register}}" class="field"><text class="label">确认密码</text><input password value="{{confirmation}}" maxlength="-1" data-field="confirmation" bindinput="input" disabled="{{busy}}" placeholder="请再次输入密码"/><text wx:if="{{field === 'confirmation'}}" class="field-error">{{error}}</text></view>
+
+    <view wx:if="{{error}}" class="error-box">{{error}}</view>
+
+    <button class="primary full submit" loading="{{busy}}" disabled="{{busy}}" bindtap="submit">{{busy ? '正在提交…' : register ? '注册并登录' : '登录'}}</button>
+    <view class="auth-hint hair-line">{{register ? '注册成功自动登录，并返回原页面。' : '登录后返回原页面，不自动提交先前操作。'}}</view>
+  </view>
+
+  <button class="link guest" disabled="{{busy}}" bindtap="browse">暂不登录，游客浏览首页</button>
+</view>

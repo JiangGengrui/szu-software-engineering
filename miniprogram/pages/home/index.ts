@@ -8,14 +8,22 @@ import { goLogin } from '../../core/source';
 import { errorMessage } from '../../core/transport';
 import { InputEvent, PageResult, Tag, TapEvent, WorkCard } from '../../core/types';
 Page({
-  data: { date: '', selectedTags: [] as string[], tags: [] as (Tag & { checked: boolean })[], showTags: false, tagLoading: false, tagError: '', list: [] as ReturnType<typeof publicCard>[], loading: false, error: '', total: 0, done: false, username: '', skeletons: [1, 2, 3], mediaFailures: {} as Record<string, boolean>, resolvedCovers: {} as Record<number, string> },
+  data: { view: 'reel' as 'reel' | 'list', current: 0, date: '', selectedTags: [] as string[], tags: [] as (Tag & { checked: boolean })[], showTags: false, tagLoading: false, tagError: '', list: [] as ReturnType<typeof publicCard>[], loading: false, error: '', total: 0, done: false, username: '', skeletons: [1, 2, 3], mediaFailures: {} as Record<string, boolean>, resolvedCovers: {} as Record<number, string> },
   pager: new Pager<WorkCard>(10),
-  onShow() { selectTab(this, 'home'); this.refresh(); void this.loadTags(); void auth.confirm().then(user => this.setData({ username: user?.username || '' })).catch(() => this.setData({ username: '' })); },
+  onShow() { selectTab(this, 'home'); if (this.pager.list.length) void this.softRefresh(); else this.refresh(); void this.loadTags(); void auth.confirm().then(user => this.setData({ username: user?.username || '' })).catch(() => this.setData({ username: '' })); },
   onUnload() { this.pager.reset(); },
-  onPullDownRefresh() { this.refresh(); },
+  onPullDownRefresh() { if (this.pager.list.length) void this.softRefresh(); else this.refresh(); },
   onReachBottom() { void this.loadMore(); },
-  sync() { const resolved = this.data.resolvedCovers; this.setData({ list: this.pager.list.map(work => { const card = publicCard(work); return resolved[work.id] ? { ...card, cover: resolved[work.id] } : card; }), total: this.pager.total, loading: this.pager.loading, error: this.pager.error, done: this.pager.done }); },
+  sync() { const resolved = this.data.resolvedCovers; const list = this.pager.list.map(work => { const card = publicCard(work); return resolved[work.id] ? { ...card, cover: resolved[work.id] } : card; }); this.setData({ list, current: Math.min(this.data.current, Math.max(list.length - 1, 0)), total: this.pager.total, loading: this.pager.loading, error: this.pager.error, done: this.pager.done }); },
   refresh() { this.pager.reset(); this.setData({ mediaFailures: {}, resolvedCovers: {} }); this.sync(); void this.loadMore(); },
+  async softRefresh() {
+    const ticket = this.pager.reload(); if (!ticket) { wx.stopPullDownRefresh(); return; }
+    this.sync();
+    try { this.pager.resolve(ticket, await api<PageResult<WorkCard>>('/api/works?' + listQuery(this.data.date, this.data.selectedTags, 1))); }
+    catch (error) { this.pager.reject(ticket, errorMessage(error)); }
+    finally { this.sync(); wx.stopPullDownRefresh(); }
+  },
+  retry() { if (this.pager.list.length) void this.softRefresh(); else this.refresh(); },
   async loadMore() {
     const ticket = this.pager.begin(); if (!ticket) return; this.sync();
     try { this.pager.resolve(ticket, await api<PageResult<WorkCard>>('/api/works?' + listQuery(this.data.date, this.data.selectedTags, ticket.page))); }
@@ -34,6 +42,12 @@ Page({
   toggleTags() { this.setData({ showTags: !this.data.showTags }); },
   changeTags(event: WechatMiniprogram.CustomEvent<{ value: string[] }>) { const names = event.detail.value; this.setData({ selectedTags: names, tags: this.data.tags.map(tag => ({ ...tag, checked: names.includes(tag.name) })) }); this.refresh(); },
   removeTag(event: TapEvent) { const names = this.data.selectedTags.filter(tag => tag !== event.currentTarget.dataset.value); this.setData({ selectedTags: names, tags: this.data.tags.map(tag => ({ ...tag, checked: names.includes(tag.name) })) }); this.refresh(); },
+  toggleView() { this.setData({ view: this.data.view === 'reel' ? 'list' : 'reel' }); },
+  swipe(event: WechatMiniprogram.CustomEvent<{ current: number }>) {
+    const current = event.detail.current;
+    this.setData({ current });
+    if (current >= this.pager.list.length - 2 && !this.pager.done && !this.pager.loading) void this.loadMore();
+  },
   open(event: TapEvent) { wx.navigateTo({ url: `/pages/detail/index?id=${event.currentTarget.dataset.id}` }); },
   login() { goLogin({ page: 'home' }); },
   imageError(event: TapEvent) {

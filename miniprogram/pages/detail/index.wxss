@@ -1,1 +1,26 @@
-.content{display:block;margin:30rpx 0}.media-list{margin-top:24rpx}.detail-image,.detail-video{width:100%;display:block;border-radius:14rpx;margin-bottom:20rpx}.scores{margin:24rpx 0;gap:10rpx}.scores button{padding:20rpx 0;min-width:44px}.rating-summary{color:#2f5597;font-weight:600}.comment{border-bottom:1px solid #e4e9f1;padding:24rpx 0}.comment:first-of-type{padding-top:0}.comment-name{font-weight:600;color:#2f5597;margin-bottom:12rpx}textarea{height:200rpx}
+.detail-page{padding:20rpx 24rpx 48rpx}
+.paper{background:#fffdf7;border:1rpx solid #e6d9bf;padding:12rpx;margin-bottom:24rpx;box-shadow:0 16rpx 32rpx -30rpx rgba(90,60,20,.75)}
+.media-list{margin-bottom:6rpx}
+.detail-image{width:100%;display:block}
+.detail-video{width:100%;display:block;background:#2b2622}
+.detail-loading-shot{width:100%;height:0;padding-bottom:60%}
+.info{padding:8rpx 4rpx 0}
+.info-head{align-items:flex-start;gap:16rpx}
+.work-title{font-size:42rpx;line-height:1.4;letter-spacing:.04em;word-break:break-all}
+.byline{margin-top:10rpx;font-size:23rpx;color:#6b6259;letter-spacing:.06em}
+.datestamp{flex:none;width:170rpx;border:1rpx solid rgba(194,112,58,.5);border-radius:3rpx;padding:10rpx 0;text-align:center;transform:rotate(2deg);background:rgba(194,112,58,.05)}
+.ds-label{display:block;font-size:18rpx;letter-spacing:.16em;color:#a97347}
+.ds-date{display:block;font-size:22rpx;color:#c2703a;margin-top:6rpx;letter-spacing:.02em}
+.tags{gap:12rpx;margin-top:18rpx}
+.content{display:block;margin:22rpx 0 8rpx}
+.rating-summary{font-size:28rpx;color:#8a5a2b;font-weight:600}
+.scores{margin:22rpx 0;gap:10rpx}
+.scores button{padding:18rpx 0;min-width:44px;border-radius:4rpx;font-variant-numeric:tabular-nums}
+.scores button.on{background:#8a5a2b;border-color:#8a5a2b;color:#fdf8ec}
+.cmt-head{display:flex;align-items:center;gap:16rpx;margin-bottom:18rpx}
+.cmt-head .section-title{margin-bottom:0}
+.note{background:#fffcf2;border:1rpx solid #ede2c9;border-left:4rpx solid rgba(194,112,58,.55);border-radius:3rpx;padding:16rpx 18rpx;margin-bottom:14rpx}
+.note-name{font-size:22rpx;color:#8a5a2b;letter-spacing:.06em;display:flex;justify-content:space-between;margin-bottom:6rpx}
+.note-time{color:#a99c86;font-variant-numeric:tabular-nums}
+.note-body{display:block;font-size:26rpx;line-height:1.8;color:#4a4238}
+textarea{height:200rpx}

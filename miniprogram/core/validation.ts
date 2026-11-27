@@ -4,7 +4,12 @@ export const IMAGE_LIMIT = 10 * 1048576;
 export const VIDEO_LIMIT = 50 * 1048576;
 export const codePoints = (value: string): number => Array.from(value).length;
 export const trimText = (value: string): string => value.replace(/^[\t-\r\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+|[\t-\r\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+$/gu, '');
-export const normalizeTags = (tags: string[]): string[] => Array.from(new Set(tags.map(trimText)));
+// Invisible or control code points and folded whitespace are removed before the tag is compared,
+// so two tags that look identical on screen cannot be stored as different names.
+export const cleanTag = (value: string): string => trimText(value
+  .replace(/[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]/gu, '')
+  .replace(/[\t-\r\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/gu, ' '));
+export const normalizeTags = (tags: string[]): string[] => Array.from(new Set(tags.map(cleanTag)));
 export function beijingToday(now = Date.now()): string { return new Date(now + 8 * 3600000).toISOString().slice(0, 10); }
 export function validDate(value: unknown): value is string {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || value.slice(0, 4) === '0000') return false;

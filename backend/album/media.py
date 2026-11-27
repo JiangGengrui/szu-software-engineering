@@ -2,23 +2,28 @@
 import os
 import re
 import struct
+import time
 import uuid
 import zlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from flask import Blueprint, current_app, g, send_file
+from flask import Blueprint, current_app, g, request, send_file
 from sqlalchemy import select
 from werkzeug.datastructures import FileStorage
 
-from .common import MAX_ID, fail, transaction
+from .auth import require_user
+from .common import MAX_ID, atomic, fail, fields, ok, transaction
 from .models import Media, User, Work, db
 
 bp = Blueprint("media", __name__)
 IMAGE_LIMIT = 10 * 1024 * 1024
 VIDEO_LIMIT = 50 * 1024 * 1024
-KEY = re.compile(r"[0-9a-f]{32}\.(?:png|jpg|mp4)")
+COVER_LIMIT = 512 * 1024
+STAGE_TTL = 3600
+KEY = re.compile(r"(?:u[0-9]{1,19}-)?[0-9a-f]{32}\.(?:png|jpg|mp4)")
+STAGED_KEY = re.compile(r"u([0-9]{1,19})-([0-9a-f]{32})\.(png|jpg|mp4)")
 TMP_KEY = re.compile(r"[0-9a-f]{32}\.part")
 
 
@@ -143,10 +148,15 @@ def valid_jpeg(data: bytes) -> bool:
                 return False
             scan_data = False
             # Entropy bytes may contain stuffed FF00 or restart markers, not arbitrary segments.
+            # Jumping to the next 0xFF keeps this linear on multi-megabyte scans instead of
+            # visiting every byte of a real photo in Python.
             while offset < len(data):
                 if data[offset] != 0xFF:
+                    next_marker = data.find(b"\xff", offset)
+                    if next_marker < 0:
+                        return False
                     scan_data = True
-                    offset += 1
+                    offset = next_marker
                     continue
                 if offset + 1 >= len(data):
                     return False
@@ -236,17 +246,20 @@ class StagedMedia:
     size: int
 
 
+MIMES = {"png": "image/png", "jpg": "image/jpeg", "mp4": "video/mp4"}
+SPECS = {
+    ".png": ("image", "image/png", valid_png, ".png"),
+    ".jpg": ("image", "image/jpeg", valid_jpeg, ".jpg"),
+    ".jpeg": ("image", "image/jpeg", valid_jpeg, ".jpg"),
+    ".mp4": ("video", "video/mp4", valid_mp4, ".mp4"),
+}
+
+
 def stage_file(upload: FileStorage, kind: str, position: int) -> StagedMedia:
     filename = upload.filename or ""
     suffix = Path(filename.replace("\\", "/")).suffix.lower()
-    specs = {
-        ".png": ("image", "image/png", valid_png, ".png"),
-        ".jpg": ("image", "image/jpeg", valid_jpeg, ".jpg"),
-        ".jpeg": ("image", "image/jpeg", valid_jpeg, ".jpg"),
-        ".mp4": ("video", "video/mp4", valid_mp4, ".mp4"),
-    }
     label = f"第{position + 1}个{'图片' if kind == 'image' else '视频'}"
-    spec = specs.get(suffix)
+    spec = SPECS.get(suffix)
     if spec is None or spec[0] != kind or upload.mimetype != spec[1]:
         fail(1015, label + "：后缀与媒体类型不匹配")
     identifier = uuid.uuid4().hex
@@ -300,13 +313,90 @@ def move_staged(staged: list[StagedMedia]) -> None:
             fail(1016)
 
 
+def staged_upload(user_id: int, upload: FileStorage) -> dict[str, Any]:
+    """Validate one file and keep it under a key that only its uploader may reference later."""
+    filename = upload.filename or ""
+    spec = SPECS.get(Path(filename.replace("\\", "/")).suffix.lower())
+    if spec is None or upload.mimetype != spec[1]:
+        fail(1015, "后缀与媒体类型不匹配")
+    key = f"u{user_id}-{uuid.uuid4().hex}{spec[3]}"
+    destination = controlled_path(key)
+    limit = IMAGE_LIMIT if spec[0] == "image" else VIDEO_LIMIT
+    size = 0
+    if destination.exists():
+        fail(1016)
+    try:
+        with destination.open("xb") as output:
+            g.new_files.append(destination)
+            while chunk := upload.stream.read(64 * 1024):
+                size += len(chunk)
+                if size > limit:
+                    fail(1015, "文件超出大小上限")
+                output.write(chunk)
+        data = destination.read_bytes()
+    except OSError:
+        fail(1016)
+    if size == 0 or not spec[2](data):
+        fail(1015, "文件头或容器结构不合法")
+    return {"key": key, "kind": spec[0], "mime": spec[1], "size_bytes": size}
+
+
+def staged_media(user_id: int, key: str) -> tuple[str, str, str, int]:
+    match = STAGED_KEY.fullmatch(key)
+    if match is None or int(match[1]) != user_id:
+        fail(1015, "媒体引用无效，请重新上传")
+    path = controlled_path(key)
+    if not path.is_file():
+        fail(1015, "媒体引用不存在或已过期，请重新上传")
+    try:
+        size = path.stat().st_size
+    except OSError:
+        fail(1016)
+    kind = "video" if match[3] == "mp4" else "image"
+    if not 0 < size <= (VIDEO_LIMIT if kind == "video" else IMAGE_LIMIT):
+        fail(1015, "媒体文件超出大小上限")
+    if db.session.scalar(select(Media.id).where(Media.file_key == key)) is not None:
+        fail(1005, "媒体引用已被使用，请重新上传")
+    return kind, MIMES[match[3]], key, size
+
+
+def staged_cover(user_id: int, key: str) -> tuple[str, str, int]:
+    match = STAGED_KEY.fullmatch(key)
+    if match is None or int(match[1]) != user_id or match[3] == "mp4":
+        fail(1015, "封面引用无效，请重新上传")
+    path = controlled_path(key)
+    if not path.is_file():
+        fail(1015, "封面引用不存在或已过期，请重新上传")
+    try:
+        size = path.stat().st_size
+    except OSError:
+        fail(1016)
+    if not 0 < size <= COVER_LIMIT:
+        fail(1015, "封面不能超过512KB")
+    return key, MIMES[match[3]], size
+
+
 def cleanup_orphans() -> None:
     """Called before serving, with the same gate; all historical rows count as references."""
     with transaction(write=True):
         referenced = set(db.session.scalars(select(Media.file_key)))
+        referenced |= {key for key in db.session.scalars(select(Work.cover_key)) if key}
         root = media_root()
         candidates = [p for p in (root / "tmp").iterdir() if TMP_KEY.fullmatch(p.name)]
-        candidates += [p for p in root.iterdir() if KEY.fullmatch(p.name) and p.name not in referenced]
+        cutoff = time.time() - STAGE_TTL
+        for path in root.iterdir():
+            if path.name in referenced or not path.is_file() or path.is_symlink():
+                continue
+            if STAGED_KEY.fullmatch(path.name):
+                # An unreferenced upload may belong to a request that is still publishing.
+                try:
+                    if path.stat().st_mtime > cutoff:
+                        continue
+                except OSError:
+                    continue
+            elif not KEY.fullmatch(path.name):
+                continue
+            candidates.append(path)
         for path in candidates:
             if path.is_file() and not path.is_symlink():
                 try:
@@ -315,14 +405,52 @@ def cleanup_orphans() -> None:
                     current_app.logger.error("media_orphan_cleanup_failed")
 
 
+@bp.post("/api/uploads")
+@atomic(write=True)
+def upload() -> Any:
+    user = require_user()
+    if request.args or request.mimetype != "multipart/form-data":
+        fail()
+    fields(request.form, set())
+    if set(request.files) != {"file"} or len(request.files.getlist("file")) != 1:
+        fail()
+    return ok(staged_upload(user.id, request.files["file"]), 201)
+
+
+@bp.route("/media/cover/<int:work_id>", methods=["GET", "HEAD"])
+def serve_cover(work_id: int) -> Any:
+    with transaction():
+        work = db.session.get(Work, work_id) if 1 <= work_id <= MAX_ID else None
+        if work is None or not work.cover_key:
+            fail(1004)
+        author = db.session.get(User, work.user_id)
+        if work.status != "visible" or author is None or author.status != "active":
+            fail(1010)
+        path, mime = controlled_path(work.cover_key), work.cover_mime or "application/octet-stream"
+        if not path.is_file():
+            fail(1004)
+    try:
+        response = send_file(path, mimetype=mime, conditional=True, etag=False, max_age=0)
+    except OSError:
+        fail(1004)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
 @bp.route("/media/<int:media_id>", methods=["GET", "HEAD"])
 def serve(media_id: int) -> Any:
     with transaction():
-        item = db.session.get(Media, media_id) if 1 <= media_id <= MAX_ID else None
-        if item is None:
+        row = db.session.execute(
+            select(Media, Work, User)
+            .select_from(Media)
+            .join(Work, Media.work_id == Work.id, isouter=True)
+            .join(User, Work.user_id == User.id, isouter=True)
+            .where(Media.id == media_id)
+        ).first() if 1 <= media_id <= MAX_ID else None
+        if row is None:
             fail(1004)
-        work = db.session.get(Work, item.work_id)
-        author = db.session.get(User, work.user_id) if work else None
+        item, work, author = row
         if not item.active or work is None or work.status != "visible" or author is None or author.status != "active":
             fail(1010)
         path, mime = controlled_path(item.file_key), item.mime

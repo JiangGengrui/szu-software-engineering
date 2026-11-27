@@ -3,7 +3,7 @@ import { auth } from './auth';
 import { UPLOAD_TIMEOUT } from './config';
 import { effectiveMedia, emptyForm, failSubmission, formFields, formFromWork, replaceSelection } from './form';
 import { confirmDiscard, selectTab, setLeaveGuard } from './leave';
-import { binaryParts, chooseMedia } from './media';
+import { chooseMedia, makeCover, uploadMedia } from './media';
 import { buildMultipart } from './multipart';
 import { detailView, myCard } from './presentation';
 import { goLogin, Source, workId } from './source';
@@ -100,10 +100,28 @@ export function createEditorPage(editing: boolean): WechatMiniprogram.Page.Optio
       this.setData({ busy: true, error: '', field: '', progress: '确认登录状态', uncertain: false });
       try {
         const user = await auth.confirm(); if (!user) { this.setData({ progress: '失败', ready: false }); goLogin(this.source()); return; }
-        this.setData({ progress: '读取媒体中' });
-        const files = await binaryParts(this.data.form.files);
+        const files = this.data.form.files;
+        const fields = formFields(this.data.form);
+        if (files.length) {
+          const keys: string[] = [];
+          for (let index = 0; index < files.length; index++) {
+            this.setData({ progress: `上传媒体 ${index + 1}/${files.length}` });
+            keys.push(await uploadMedia(files[index]));
+          }
+          fields.media_keys = JSON.stringify(keys);
+          this.setData({ progress: '生成封面' });
+          const cover = await makeCover(files[0]);
+          if (cover) {
+            this.setData({ progress: '上传封面' });
+            // A missing thumbnail only falls back to the first saved image; it must not block publishing.
+            let coverKey = '';
+            try { coverKey = await uploadMedia(cover); } catch { coverKey = ''; }
+            if (coverKey) fields.cover_key = coverKey;
+          }
+        }
         const boundary = `CampusAlbum_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-        const multipart = buildMultipart(formFields(this.data.form), files, boundary);
+        this.setData({ progress: '提交中，请勿重复提交' });
+        const multipart = await buildMultipart(fields, [], boundary);
         this.setData({ progress: '上传中，请勿重复提交' });
         const work = await api<WorkDetail>(editing ? `/api/works/${this.id}` : '/api/works', { method: editing ? 'PUT' : 'POST', protected: true, source: this.source(), data: multipart.body, contentType: multipart.contentType, timeout: UPLOAD_TIMEOUT });
         this.setData({ progress: '完成', dirty: false }); wx.disableAlertBeforeUnload();
